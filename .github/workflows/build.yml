@@ -16,6 +16,12 @@ jobs:
       with:
         python-version: '3.11'
 
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       with:
@@ -33,13 +39,10 @@ jobs:
 
     - name: Build APK with Buildozer
       env:
-        # ЖОРСТКА ФІКСАЦІЯ: Наказуємо Buildozer використовувати перевірені версії інструментів,
-        # щоб він не намагався качати сиру 37-му версію
         ANDROID_API: "33"
         ANDROID_MINAPI: "24"
         ANDROID_BUILD_TOOLS_VERSION: "33.0.0"
       run: |
-        # Створюємо базову конфігурацію ліцензій
         mkdir -p ~/.android
         touch ~/.android/repositories.cfg
         
