@@ -26,28 +26,29 @@ jobs:
         pip install --upgrade pip
         pip install "buildozer>=1.5.0" "cython<3.0.0" virtualenv Kivy
 
-    - name: Pre-configure Android SDK Path for Buildozer
+    - name: Pre-configure Android SDK and Accept ALL Licenses
       run: |
-        # Створюємо правильну структуру папок під sdkmanager до запуску Buildozer,
-        # щоб обійти конфлікт шляхів у нових версіях Google SDK
+        # 1. Створюємо структуру папок
         mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin
         mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
         
-        # Завантажуємо стабільну версію командних інструментів, де є правильний sdkmanager
+        # 2. Завантажуємо офіційні інструменти командного рядка Android
         wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
         unzip -q tools.zip -d ~/.buildozer/android/platform/android-sdk/
         
-        # Переносимо інструменти у правильне дерево папок, яке очікує Buildozer
+        # 3. Розкладаємо файли так, як їх очікує і нова, і стара архітектура Buildozer
         mv ~/.buildozer/android/platform/android-sdk/cmdline-tools/* ~/.buildozer/android/platform/android-sdk/tools/ 2>/dev/null || true
         cp -r ~/.buildozer/android/platform/android-sdk/tools/* ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/ 2>/dev/null || true
         
-        # Автоматично приймаємо ліцензії для цієї версії
-        mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
-        echo -e "244d24d21d31d107c4159f4a38780a216d25344e\n24333f1a63b68b44d1d247d4f56f1707b5e633e4\n84831b9409646a918e30573bab4c9c91346d8abd" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+        # 4. Прописуємо шлях до інструментів у систему
+        export PATH=$PATH:~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:~/.buildozer/android/platform/android-sdk/tools/bin
+        
+        # 5. КРИТИЧНИЙ РЯДОК: Автоматично підписуємо абсолютно ВСІ ліцензії Google Android SDK
+        yes | ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=/home/runner/.buildozer/android/platform/android-sdk --licenses || true
 
     - name: Build APK with Buildozer
       run: |
-        # Запускаємо фінальну збірку
+        # Запускаємо збірку додатку
         buildozer android debug
 
     - name: Upload APK Artifact
