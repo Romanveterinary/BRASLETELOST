@@ -1,32 +1,58 @@
 [app]
-# Назва твого додатка на екрані телефона
+
+# (string) Title of your application
 title = VetTrack Anti-Lost
 
-# Назва пакету для системи Android (без пробілів)
+# (string) Package name
 package.name = vettrack_antilost
+
+# (string) Package domain (needed for android packaging)
 package.domain = com.romanveterinary
 
-# З якими файлами збирати додаток (включаємо Python та наш звук)
-source.include_exts = py,png,jpg,kv,atlas,wav,mp3
+# (string) Source code where the main.py lives
 source.dir = .
 
-# Версія додатка
+# (list) Source files to include (let empty to include all the files)
+source.include_exts = py,png,jpg,kv,atlas,wav,mp3
+
+# (string) Application version
 version = 1.0
 
-# Бібліотеки, які Buildozer має зашити всередину APK
-requirements = python3,kivy,bleak,asyncio
+# (list) Application requirements
+# ВИПРАВЛЕНО: додано jnius, pyobjus, android для стабільної роботи bleak та Bluetooth
+requirements = python3,kivy==2.3.1,bleak,asyncio,jnius,pyobjus,android,cython<3.0.0
 
-# Орієнтація екрану (строго вертикальна для смартфона)
+# (str) Supported orientations
 orientation = portrait
 
-# Системні вимоги та налаштування Android
-osx.kivy_version = 2.3.1
+# (bool) Indicate if the application should be fullscreen or not
 fullscreen = 0
-android.archs = arm64-v8a
 
-# КРИТИЧНО ВАЖЛИВО: Дозволи на Bluetooth для Android 
-# (без них радар на телефоні буде сліпим і система його заблокує)
+# (list) Permissions
+# КРИТИЧНО: Повний набір дозволів для роботи з Bluetooth на сучасних Android
 android.permissions = BLUETOOTH, BLUETOOTH_ADMIN, BLUETOOTH_SCAN, BLUETOOTH_CONNECT, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION
 
-# Вказуємо, що додаток може працювати у фоні (щоб не вимикався в кишені)
+# (int) Target Android API, should be as high as possible.
+android.api = 33
+
+# (int) Minimum API your APK will support.
+android.minapi = 24
+
+# (str) Android NDK version to use
+android.ndk = 25.2.9519653
+
+# (list) The Android architectures to build for
+android.archs = arm64-v8a
+
+# (str) Intent launch mode
 android.manifest.launch_mode = singleTask
+
+# (bool) Copy library instead of making a symlink
+p4a.branch = master
+
+[buildozer]
+# (int) Log level (0 = error only, 1 = info, 2 = debug (with command output))
+log_level = 2
+
+# (int) Display warning if buildozer is run as root (0 = False, 1 = True)
+warn_on_root = 1
