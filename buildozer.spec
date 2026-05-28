@@ -19,7 +19,7 @@ source.include_exts = py,png,jpg,kv,atlas,wav,mp3
 version = 1.0
 
 # (list) Application requirements
-# ВИПРАВЛЕНО: додано jnius, pyobjus, android для стабільної роботи bleak та Bluetooth
+# jnius, pyobjus, android необхідні для стабільної роботи bleak та системного Bluetooth
 requirements = python3,kivy==2.3.1,bleak,asyncio,jnius,pyobjus,android,cython<3.0.0
 
 # (str) Supported orientations
@@ -29,7 +29,7 @@ orientation = portrait
 fullscreen = 0
 
 # (list) Permissions
-# КРИТИЧНО: Повний набір дозволів для роботи з Bluetooth на сучасних Android
+# Повний набір дозволів для роботи з Bluetooth на сучасних смартфонах Android
 android.permissions = BLUETOOTH, BLUETOOTH_ADMIN, BLUETOOTH_SCAN, BLUETOOTH_CONNECT, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION
 
 # (int) Target Android API, should be as high as possible.
@@ -38,8 +38,9 @@ android.api = 33
 # (int) Minimum API your APK will support.
 android.minapi = 24
 
-# (str) Android NDK version to use
-android.ndk = 25.2.9519653
+# УВАГА: Рядок android.ndk свідомо закоментовано! 
+# Це дозволяє Buildozer автоматично скачати актуальну робочу версію NDK і уникати помилки 404.
+# android.ndk = 25.2.9519653
 
 # (list) The Android architectures to build for
 android.archs = arm64-v8a
