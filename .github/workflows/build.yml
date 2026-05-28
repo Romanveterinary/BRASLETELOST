@@ -22,11 +22,6 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-      with:
-        log-accepted-licenses: false
-
     - name: Install system dependencies
       run: |
         sudo apt-get update
@@ -38,16 +33,9 @@ jobs:
         pip install "buildozer>=1.5.0" "cython<3.0.0" virtualenv Kivy
 
     - name: Build APK with Buildozer
-      env:
-        ANDROID_API: "33"
-        ANDROID_MINAPI: "24"
-        ANDROID_BUILD_TOOLS_VERSION: "33.0.0"
       run: |
-        mkdir -p ~/.android
-        touch ~/.android/repositories.cfg
-        
-        # Запускаємо збірку додатку
-        buildozer android debug
+        # Команда yes автоматично відповідає "y" (так) на всі запити про ліцензії!
+        yes | buildozer android debug
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
