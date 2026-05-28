@@ -12,25 +12,19 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/actions-setup-python@v5
+      uses: actions/setup-python@v5  # Виправлено тут
       with:
         python-version: '3.11'
 
     - name: Install platform dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libsqlite3-dev lldb lld bzip2 libbz2-dev libffi-dev libssl-dev tags
+        sudo apt-get install -y libsqlite3-dev lldb lld bzip2 libbz2-dev libffi-dev libssl-dev autoconf libtool pkg-config
 
     - name: Build with Buildozer
-      uses: ArtemGovorov/buildozer-action@v1
+      uses: actions4kivy/buildozer-action@v1  # Виправлено на найсучасніший і стабільний екшен
       id: buildozer
       with:
+        workdir: .
         buildozer_version: master
         command: buildozer android debug
-        repository_root: .
-
-    - name: Upload APK artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: VetTrack-AntiLost-APK
-        path: ${{ steps.buildozer.outputs.filename }}
