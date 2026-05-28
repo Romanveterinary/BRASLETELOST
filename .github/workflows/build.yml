@@ -19,7 +19,7 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev libsqlite3-dev tk-dev libgdbm-compat-dev libreoffice-dev libmpdec-dev
+        sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev libsqlite3-dev tk-dev libgdbm-compat-dev libreoffice-dev
 
     - name: Install Buildozer and Cython
       run: |
@@ -28,7 +28,7 @@ jobs:
 
     - name: Build APK with Buildozer
       run: |
-        # Запускаємо чисту збірку в автоматичному хмарному режимі (yes погоджується з ліцензіями Android SDK)
+        # Запускаємо збірку в автоматичному режимі
         yes | buildozer android debug
 
     - name: Upload APK Artifact
