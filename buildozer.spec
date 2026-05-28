@@ -19,8 +19,8 @@ source.include_exts = py,png,jpg,kv,atlas,wav,mp3
 version = 1.0
 
 # (list) Application requirements
-# ТУТ ГОЛОВНА ЗМІНА: прибрали pyobjus та cython
-requirements = python3,kivy==2.3.1,bleak,asyncio,jnius,android
+# Чистий список: тільки те, що реально потрібно для Android
+requirements = python3,kivy==2.3.1,bleak,jnius,android
 
 # (str) Supported orientations
 orientation = portrait
