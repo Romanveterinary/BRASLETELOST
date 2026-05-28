@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04 # Фіксуємо стабільну версію Ubuntu під Android SDK
 
     steps:
     - name: Checkout repository
@@ -24,12 +24,12 @@ jobs:
     - name: Install Buildozer and Cython
       run: |
         pip install --upgrade pip
-        pip install buildozer cython virtualenv Kivy
+        pip install "buildozer>=1.5.0" "cython<3.0.0" virtualenv Kivy
 
     - name: Build APK with Buildozer
       run: |
-        # Запускаємо збірку в автоматичному режимі
-        yes | buildozer android debug
+        # Генеруємо збірку, автоматично приймаючи ліцензії SDK
+        buildozer android debug
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
