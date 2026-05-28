@@ -1,58 +1,47 @@
-[app]
+name: Build APK
 
-# (string) Title of your application
-title = VetTrack Anti-Lost
+on:
+  workflow_dispatch: # Ручний запуск
 
-# (string) Package name
-package.name = vettrack_antilost
+jobs:
+  build:
+    runs-on: ubuntu-22.04
 
-# (string) Package domain (needed for android packaging)
-package.domain = com.romanveterinary
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-# (string) Source code where the main.py lives
-source.dir = .
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
 
-# (list) Source files to include (let empty to include all the files)
-source.include_exts = py,png,jpg,kv,atlas,wav,mp3
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        log-accepted-licenses: false
 
-# (string) Application version
-version = 1.0
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev libsqlite3-dev tk-dev libgdbm-compat-dev libreoffice-dev
 
-# (list) Application requirements
-# jnius, pyobjus, android необхідні для стабільної роботи bleak та системного Bluetooth на мобільному залізі
-requirements = python3,kivy==2.3.1,bleak,asyncio,jnius,pyobjus,android,cython<3.0.0
+    - name: Install Buildozer and Cython
+      run: |
+        pip install --upgrade pip
+        pip install "buildozer>=1.5.0" "cython<3.0.0" virtualenv Kivy
 
-# (str) Supported orientations
-orientation = portrait
+    - name: Build APK with Buildozer
+      run: |
+        # Запускаємо автоматичне підтвердження ліцензій перед стартом
+        mkdir -p ~/.android
+        touch ~/.android/repositories.cfg
+        
+        # Передаємо Buildozer команду на збірку
+        buildozer android debug
 
-# (bool) Indicate if the application should be fullscreen or not
-fullscreen = 0
-
-# (list) Permissions
-# Повний набір дозволів для роботи з Bluetooth на сучасних смартфонах Android
-android.permissions = BLUETOOTH, BLUETOOTH_ADMIN, BLUETOOTH_SCAN, BLUETOOTH_CONNECT, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION
-
-# (int) Target Android API
-android.api = 33
-
-# (str) Android SDK build-tools version to use
-android.build_tools_version = 33.0.0
-
-# (int) Minimum API your APK will support
-android.minapi = 24
-
-# (list) The Android architectures to build for
-android.archs = arm64-v8a
-
-# (str) Intent launch mode
-android.manifest.launch_mode = singleTask
-
-# (bool) Copy library instead of making a symlink
-p4a.branch = master
-
-[buildozer]
-# (int) Log level (0 = error only, 1 = info, 2 = debug (with command output))
-log_level = 2
-
-# (int) Display warning if buildozer is run as root (0 = False, 1 = True)
-warn_on_root = 1
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: VetTrack-AntiLost-APK
+        path: bin/*.apk
