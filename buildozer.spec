@@ -20,7 +20,7 @@ version = 1.0
 
 # (list) Application requirements
 # Чистий список: тільки те, що реально потрібно для Android
-requirements = python3,kivy==2.3.1,bleak,jnius,android
+requirements = python3,kivy==2.3.1,jnius,android
 
 # (str) Supported orientations
 orientation = portrait
