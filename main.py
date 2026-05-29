@@ -16,7 +16,7 @@ try:
     from kivy.core.window import Window
     from kivy.core.audio import SoundLoader
     from kivy.utils import platform
-    from kivy.clock import Clock
+    from kivy.clock import Clock, mainthread
 
     # Фіксуємо розмір тільки для ПК
     if platform not in ('android', 'ios'):
@@ -98,7 +98,7 @@ try:
             box_rssi.add_widget(self.rssi_info)
             layout.add_widget(box_rssi)
 
-            # Блок 2: Інтервал пінгу (Не використовується напряму в BLE, але залишаємо для логіки)
+            # Блок 2: Інтервал пінгу
             box_ping = BoxLayout(orientation='vertical', size_hint_y=0.15)
             box_ping.add_widget(Label(text="ІНТЕРВАЛ ОПИТУВАННЯ", font_size='14sp', bold=True))
             self.ping_slider = Slider(min=1, max=10, value=2, step=1)
@@ -148,7 +148,8 @@ try:
         def on_time_change(self, instance, value): self.time_info.text = f"Час очікування: {int(value)} секунд"
         def on_duration_change(self, instance, value): self.duration_info.text = f"Автовимкнення через: {int(value)} хв"
 
-        # Колбек, який викликається Java-сканером при знаходженні пристрою
+        # Декоратор mainthread гарантує безпечне оновлення даних
+        @mainthread
         def on_device_found(self, address, name, rssi):
             if address == self.target_mac:
                 self.last_seen_time = time.time()
@@ -179,14 +180,12 @@ try:
             self.status_label.color = (0.2, 0.7, 0.8, 1)
             self.disconnect_start_time = None
             self.alarm_start_time = None
-            self.last_seen_time = time.time() # Ініціалізація
+            self.last_seen_time = time.time()
             
-            # Запускаємо нативний сканер
             if self.ble_scanner:
                 self.scan_callback = BLEScanCallback(self.on_device_found)
                 self.ble_scanner.startScan(self.scan_callback)
             
-            # Запускаємо цикл перевірки
             self.monitor_event = Clock.schedule_interval(self.check_status, self.ping_slider.value)
 
         def check_status(self, dt):
@@ -195,7 +194,6 @@ try:
             timeout_limit = self.time_slider.value
             max_alarm_duration = self.duration_slider.value * 60
 
-            # Якщо сирена звучить задовго
             if self.alarm_start_time and (current_time - self.alarm_start_time >= max_alarm_duration):
                 if self.alarm_sound and self.alarm_sound.state == 'play':
                     self.alarm_sound.stop()
@@ -203,7 +201,6 @@ try:
                 self.status_label.color = (0.7, 0.4, 0.7, 1)
                 return
 
-            # Якщо пристрій не бачили довше, ніж 2 секунди, вважаємо, що він "затих"
             device_missing = (current_time - self.last_seen_time) > 2.0
             
             if device_missing or self.last_seen_rssi < target_rssi:
@@ -264,7 +261,6 @@ try:
             super().__init__(**kwargs)
             self.found_devices = {}
             
-            # Ініціалізація сканера
             self.ble_scanner = None
             self.scan_callback = None
             if platform == "android":
@@ -306,8 +302,9 @@ try:
         def on_enter(self):
             self.load_config()
             
+        # Декоратор mainthread гарантує, що кнопка малюється у безпечному потоці!
+        @mainthread
         def on_device_found(self, address, name, rssi):
-            # Додаємо пристрій, якщо його ще немає або оновлюємо сигнал
             if address not in self.found_devices:
                 self.found_devices[address] = True
                 dev_name = name if name else "Невідомий пристрій"
@@ -332,11 +329,9 @@ try:
             self.devices_container.height = 0
             self.found_devices.clear()
             
-            # Запускаємо сканування
             self.scan_callback = BLEScanCallback(self.on_device_found)
             self.ble_scanner.startScan(self.scan_callback)
             
-            # Зупиняємо через 4 секунди
             Clock.schedule_once(self.stop_ble_scan, 4.0)
 
         def stop_ble_scan(self, dt):
