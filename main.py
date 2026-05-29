@@ -1,7 +1,6 @@
 import traceback
 
 try:
-    import asyncio
     import json
     import os
     import time
@@ -17,11 +16,44 @@ try:
     from kivy.core.window import Window
     from kivy.core.audio import SoundLoader
     from kivy.utils import platform
-    from bleak import BleakScanner
+    from kivy.clock import Clock
 
     # Фіксуємо розмір тільки для ПК
     if platform not in ('android', 'ios'):
         Window.size = (400, 720)
+
+    # Налаштування нативного Bluetooth для Android
+    if platform == "android":
+        from jnius import autoclass, PythonJavaClass, java_method
+        
+        BluetoothAdapter = autoclass('android.bluetooth.BluetoothAdapter')
+        ScanSettings = autoclass('android.bluetooth.le.ScanSettings')
+        
+        # Створюємо Python-клас, який виконує роль Java Callback
+        class BLEScanCallback(PythonJavaClass):
+            __javainterfaces__ = ['android/bluetooth/le/ScanCallback']
+            __javacontext__ = 'app'
+
+            def __init__(self, ui_callback):
+                super().__init__()
+                self.ui_callback = ui_callback
+
+            @java_method('(ILandroid/bluetooth/le/ScanResult;)V')
+            def onScanResult(self, callbackType, result):
+                device = result.getDevice()
+                address = device.getAddress()
+                name = device.getName()
+                rssi = result.getRssi()
+                # Передаємо дані в інтерфейс
+                self.ui_callback(address, name, rssi)
+
+            @java_method('(Ljava/util/List;)V')
+            def onBatchScanResults(self, results):
+                pass
+
+            @java_method('(I)V')
+            def onScanFailed(self, errorCode):
+                print(f"Помилка сканування: {errorCode}")
 
     def get_config_path():
         return os.path.join(App.get_running_app().user_data_dir, "anti_lost_config.json")
@@ -29,15 +61,26 @@ try:
     class MainScreen(Screen):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
-            self.monitor_task = None  
+            self.monitor_event = None  
             self.disconnect_start_time = None
             self.alarm_start_time = None  
+            self.target_mac = ""
+            self.last_seen_time = 0
+            self.last_seen_rssi = -100
             
             self.alarm_sound = SoundLoader.load('sonar.wav')
             if self.alarm_sound:
                 self.alarm_sound.loop = True
+                
+            # Ініціалізація сканера
+            self.ble_scanner = None
+            self.scan_callback = None
+            if platform == "android":
+                adapter = BluetoothAdapter.getDefaultAdapter()
+                if adapter:
+                    self.ble_scanner = adapter.getBluetoothLeScanner()
             
-            # Пропорційний макет на весь екран
+            # Пропорційний макет
             layout = BoxLayout(orientation='vertical', padding=30, spacing=15)
 
             layout.add_widget(Label(text="VET-TRACK: ANTI-LOST", font_size='24sp', bold=True, size_hint_y=0.1))
@@ -55,7 +98,7 @@ try:
             box_rssi.add_widget(self.rssi_info)
             layout.add_widget(box_rssi)
 
-            # Блок 2: Інтервал пінгу
+            # Блок 2: Інтервал пінгу (Не використовується напряму в BLE, але залишаємо для логіки)
             box_ping = BoxLayout(orientation='vertical', size_hint_y=0.15)
             box_ping.add_widget(Label(text="ІНТЕРВАЛ ОПИТУВАННЯ", font_size='14sp', bold=True))
             self.ping_slider = Slider(min=1, max=10, value=2, step=1)
@@ -105,7 +148,28 @@ try:
         def on_time_change(self, instance, value): self.time_info.text = f"Час очікування: {int(value)} секунд"
         def on_duration_change(self, instance, value): self.duration_info.text = f"Автовимкнення через: {int(value)} хв"
 
+        # Колбек, який викликається Java-сканером при знаходженні пристрою
+        def on_device_found(self, address, name, rssi):
+            if address == self.target_mac:
+                self.last_seen_time = time.time()
+                self.last_seen_rssi = rssi
+
         def start_monitoring(self, instance):
+            self.target_mac = ""
+            config_file = get_config_path()
+            if os.path.exists(config_file):
+                try:
+                    with open(config_file, "r") as f:
+                        self.target_mac = json.load(f).get("mac_address", "").strip()
+                except Exception:
+                    pass
+
+            if not self.target_mac:
+                self.status_label.text = "СПОЧАТКУ ВИБЕРІТЬ ПРИСТРІЙ В НАЛАШТУВАННЯХ!"
+                self.status_label.font_size = '12sp'
+                self.status_label.color = (1, 0.2, 0.2, 1)
+                return
+
             self.btn_start.disabled = True
             self.btn_stop.disabled = False
             self.toggle_sliders(disabled=True)
@@ -115,12 +179,66 @@ try:
             self.status_label.color = (0.2, 0.7, 0.8, 1)
             self.disconnect_start_time = None
             self.alarm_start_time = None
-            self.monitor_task = asyncio.ensure_future(self.ble_monitor_loop())
+            self.last_seen_time = time.time() # Ініціалізація
+            
+            # Запускаємо нативний сканер
+            if self.ble_scanner:
+                self.scan_callback = BLEScanCallback(self.on_device_found)
+                self.ble_scanner.startScan(self.scan_callback)
+            
+            # Запускаємо цикл перевірки
+            self.monitor_event = Clock.schedule_interval(self.check_status, self.ping_slider.value)
+
+        def check_status(self, dt):
+            current_time = time.time()
+            target_rssi = self.rssi_slider.value
+            timeout_limit = self.time_slider.value
+            max_alarm_duration = self.duration_slider.value * 60
+
+            # Якщо сирена звучить задовго
+            if self.alarm_start_time and (current_time - self.alarm_start_time >= max_alarm_duration):
+                if self.alarm_sound and self.alarm_sound.state == 'play':
+                    self.alarm_sound.stop()
+                self.status_label.text = "ТРИВОГА ВИМКНЕНА ЗА ТАЙМАУТОМ"
+                self.status_label.color = (0.7, 0.4, 0.7, 1)
+                return
+
+            # Якщо пристрій не бачили довше, ніж 2 секунди, вважаємо, що він "затих"
+            device_missing = (current_time - self.last_seen_time) > 2.0
+            
+            if device_missing or self.last_seen_rssi < target_rssi:
+                if self.disconnect_start_time is None:
+                    self.disconnect_start_time = current_time
+                
+                elapsed = current_time - self.disconnect_start_time
+                self.status_label.text = f"ВТРАТА ЗВ'ЯЗКУ! ({int(elapsed)}с)"
+                self.status_label.color = (0.9, 0.4, 0.1, 1)
+
+                if elapsed >= timeout_limit:
+                    self.status_label.text = "ТРИВОГА! ПРИСТРІЙ ВІДСУТНІЙ!"
+                    self.status_label.color = (1, 0, 0, 1)
+                    
+                    if self.alarm_start_time is None:
+                        self.alarm_start_time = current_time 
+                    
+                    if self.alarm_sound and self.alarm_sound.state == 'stop':
+                        self.alarm_sound.play()
+            else:
+                if self.alarm_sound and self.alarm_sound.state == 'play':
+                    self.alarm_sound.stop()
+                self.disconnect_start_time = None
+                self.alarm_start_time = None
+                self.status_label.text = f"ПРИСТРІЙ ПОРУЧ | Сигнал: {self.last_seen_rssi} dBm"
+                self.status_label.color = (0.2, 0.8, 0.2, 1)
 
         def stop_monitoring(self, instance):
-            if self.monitor_task:
-                self.monitor_task.cancel()
-                self.monitor_task = None
+            if self.monitor_event:
+                self.monitor_event.cancel()
+                self.monitor_event = None
+                
+            if self.ble_scanner and self.scan_callback:
+                self.ble_scanner.stopScan(self.scan_callback)
+                self.scan_callback = None
                 
             if self.alarm_sound and self.alarm_sound.state == 'play':
                 self.alarm_sound.stop()
@@ -141,76 +259,19 @@ try:
         def go_to_settings(self, instance):
             self.manager.current = 'settings'
 
-        async def ble_monitor_loop(self):
-            mac_address = ""
-            config_file = get_config_path()
-            if os.path.exists(config_file):
-                try:
-                    with open(config_file, "r") as f:
-                        mac_address = json.load(f).get("mac_address", "").strip()
-                except Exception:
-                    pass
-
-            if not mac_address:
-                self.status_label.text = "СПОЧАТКУ ВИБЕРІТЬ ПРИСТРІЙ В НАЛАШТУВАННЯХ!"
-                self.status_label.font_size = '12sp'
-                self.status_label.color = (1, 0.2, 0.2, 1)
-                self.stop_monitoring(None)
-                return
-
-            while True:
-                try:
-                    target_rssi = self.rssi_slider.value
-                    ping_interval = self.ping_slider.value
-                    timeout_limit = self.time_slider.value
-                    max_alarm_duration = self.duration_slider.value * 60
-
-                    device = await BleakScanner.find_device_by_address(mac_address, timeout=1.5)
-                    current_time = time.time()
-
-                    if self.alarm_start_time and (current_time - self.alarm_start_time >= max_alarm_duration):
-                        if self.alarm_sound and self.alarm_sound.state == 'play':
-                            self.alarm_sound.stop()
-                        self.status_label.text = "ТРИВОГА ВИМКНЕНА ЗА ТАЙМАУТОМ"
-                        self.status_label.color = (0.7, 0.4, 0.7, 1)
-                        await asyncio.sleep(ping_interval)
-                        continue
-
-                    if device is None or device.rssi < target_rssi:
-                        if self.disconnect_start_time is None:
-                            self.disconnect_start_time = current_time
-                        
-                        elapsed = current_time - self.disconnect_start_time
-                        self.status_label.text = f"ВТРАТА ЗВ'ЯЗКУ! ({int(elapsed)}с)"
-                        self.status_label.color = (0.9, 0.4, 0.1, 1)
-
-                        if elapsed >= timeout_limit:
-                            self.status_label.text = "ТРИВОГА! ПРИСТРІЙ ВІДСУТНІЙ!"
-                            self.status_label.color = (1, 0, 0, 1)
-                            
-                            if self.alarm_start_time is None:
-                                self.alarm_start_time = current_time 
-                            
-                            if self.alarm_sound and self.alarm_sound.state == 'stop':
-                                self.alarm_sound.play()
-                    else:
-                        if self.alarm_sound and self.alarm_sound.state == 'play':
-                            self.alarm_sound.stop()
-                        self.disconnect_start_time = None
-                        self.alarm_start_time = None
-                        self.status_label.text = f"ПРИСТРІЙ ПОРУЧ | Сигнал: {device.rssi} dBm"
-                        self.status_label.color = (0.2, 0.8, 0.2, 1)
-
-                except asyncio.CancelledError:
-                    break
-                except Exception as e:
-                    print(f"Помилка циклу моніторингу: {e}")
-
-                await asyncio.sleep(ping_interval)
-
     class SettingsScreen(Screen):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
+            self.found_devices = {}
+            
+            # Ініціалізація сканера
+            self.ble_scanner = None
+            self.scan_callback = None
+            if platform == "android":
+                adapter = BluetoothAdapter.getDefaultAdapter()
+                if adapter:
+                    self.ble_scanner = adapter.getBluetoothLeScanner()
+            
             layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
 
             layout.add_widget(Label(text="НАЛАШТУВАННЯ", font_size='20sp', bold=True, size_hint_y=0.1))
@@ -223,7 +284,7 @@ try:
             self.key_input = TextInput(text="", multiline=False, font_size='14sp', size_hint_y=0.1)
             layout.add_widget(self.key_input)
 
-            layout.add_widget(Label(text="БЛЮТУЗ РАДАР (Клікни на пристрій для вибору):", font_size='12sp', color=(0.2, 0.7, 0.8, 1), size_hint_y=0.05))
+            layout.add_widget(Label(text="БЛЮТУЗ РАДАР (Клікни на пристрій):", font_size='12sp', color=(0.2, 0.7, 0.8, 1), size_hint_y=0.05))
             
             self.scroll_view = ScrollView(size_hint=(1, 0.35))
             self.devices_container = BoxLayout(orientation='vertical', spacing=5, size_hint_y=None)
@@ -244,40 +305,52 @@ try:
             
         def on_enter(self):
             self.load_config()
+            
+        def on_device_found(self, address, name, rssi):
+            # Додаємо пристрій, якщо його ще немає або оновлюємо сигнал
+            if address not in self.found_devices:
+                self.found_devices[address] = True
+                dev_name = name if name else "Невідомий пристрій"
+                btn_text = f"{dev_name} \n[{address}] | {rssi} dBm"
+                
+                dev_btn = ToggleButton(text=btn_text, group='ble_dev', size_hint=(1, None), height=100, font_size='14sp')
+                dev_btn.bind(on_press=lambda inst, addr=address: self.select_device(addr))
+                
+                self.devices_container.add_widget(dev_btn)
+                self.devices_container.height += 105
 
         def start_ble_scan(self, instance):
+            if not self.ble_scanner:
+                lbl = Label(text="Помилка: Немає доступу до Bluetooth", font_size='12sp', size_hint_y=None, height=40)
+                self.devices_container.add_widget(lbl)
+                self.devices_container.height += 40
+                return
+
             self.btn_scan.disabled = True
-            self.btn_scan.text = "ШУКАЮ ПРИСТРОЇ..."
+            self.btn_scan.text = "ШУКАЮ ПРИСТРОЇ (4 СЕК)..."
             self.devices_container.clear_widgets()
             self.devices_container.height = 0
-            asyncio.ensure_future(self.scan_devices_async())
+            self.found_devices.clear()
+            
+            # Запускаємо сканування
+            self.scan_callback = BLEScanCallback(self.on_device_found)
+            self.ble_scanner.startScan(self.scan_callback)
+            
+            # Зупиняємо через 4 секунди
+            Clock.schedule_once(self.stop_ble_scan, 4.0)
 
-        async def scan_devices_async(self):
-            try:
-                devices = await BleakScanner.discover(timeout=4.0)
-                self.devices_container.clear_widgets()
-                self.devices_container.height = 0
-                
-                if not devices:
-                    lbl = Label(text="Нічого не знайдено. Увімкніть Bluetooth.", font_size='12sp', size_hint_y=None, height=40)
-                    self.devices_container.add_widget(lbl)
-                    self.devices_container.height += 40
-                else:
-                    for d in devices:
-                        name = d.name if d.name else "Невідомий пристрій"
-                        btn_text = f"{name} \n[{d.address}] | {d.rssi} dBm"
-                        
-                        dev_btn = ToggleButton(text=btn_text, group='ble_dev', size_hint=(1, None), height=55, font_size='11sp')
-                        dev_btn.bind(on_press=lambda inst, addr=d.address: self.select_device(addr))
-                        
-                        self.devices_container.add_widget(dev_btn)
-                        self.devices_container.height += 60
-                        
-            except Exception as e:
-                print(f"Помилка радара: {e}")
-            finally:
-                self.btn_scan.disabled = False
-                self.btn_scan.text = "ЗАПУСТИТИ РАДАР ЕФІРУ"
+        def stop_ble_scan(self, dt):
+            if self.ble_scanner and self.scan_callback:
+                self.ble_scanner.stopScan(self.scan_callback)
+                self.scan_callback = None
+            
+            self.btn_scan.disabled = False
+            self.btn_scan.text = "ЗАПУСТИТИ РАДАР ЕФІРУ"
+            
+            if not self.found_devices:
+                lbl = Label(text="Нічого не знайдено. Увімкніть Bluetooth.", font_size='12sp', size_hint_y=None, height=40)
+                self.devices_container.add_widget(lbl)
+                self.devices_container.height += 40
 
         def select_device(self, address):
             self.mac_input.text = address
@@ -318,7 +391,7 @@ try:
             return sm
 
     if __name__ == "__main__":
-        asyncio.run(AntiLostApp().async_run(async_lib='asyncio'))
+        AntiLostApp().run()
 
 except Exception as e:
     from kivy.app import App
