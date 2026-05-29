@@ -19,8 +19,9 @@ try:
     from kivy.utils import platform
     from bleak import BleakScanner
 
-    # Фіксуємо розмір під мобільний екран для тестів на ПК
-    Window.size = (400, 720)
+    # ВИПРАВЛЕННЯ: Фіксуємо розмір тільки для ПК, на Android додаток буде на весь екран
+    if platform not in ('android', 'ios'):
+        Window.size = (400, 720)
 
     def get_config_path():
         # На Android зберігаємо конфіг у дозволену системну папку додатка
@@ -304,7 +305,6 @@ try:
             return sm
 
     if __name__ == "__main__":
-        # Правильний і єдиний спосіб запуску asyncio у нових версіях Python
         asyncio.run(AntiLostApp().async_run(async_lib='asyncio'))
 
 except Exception as e:
