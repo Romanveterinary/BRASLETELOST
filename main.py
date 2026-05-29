@@ -22,38 +22,28 @@ try:
     if platform not in ('android', 'ios'):
         Window.size = (400, 720)
 
-    # Налаштування нативного Bluetooth для Android
+    # Налаштування нативного Bluetooth для Android через інтерфейс LeScanCallback
     if platform == "android":
         from jnius import autoclass, PythonJavaClass, java_method
         
         BluetoothAdapter = autoclass('android.bluetooth.BluetoothAdapter')
-        ScanSettings = autoclass('android.bluetooth.le.ScanSettings')
         
-        # Створюємо Python-клас, який виконує роль Java Callback
+        # Створюємо Python-клас, який виконує роль Java-інтерфейсу
         class BLEScanCallback(PythonJavaClass):
-            __javainterfaces__ = ['android/bluetooth/le/ScanCallback']
+            __javainterfaces__ = ['android/bluetooth/BluetoothAdapter$LeScanCallback']
             __javacontext__ = 'app'
 
             def __init__(self, ui_callback):
                 super().__init__()
                 self.ui_callback = ui_callback
 
-            @java_method('(ILandroid/bluetooth/le/ScanResult;)V')
-            def onScanResult(self, callbackType, result):
-                device = result.getDevice()
-                address = device.getAddress()
-                name = device.getName()
-                rssi = result.getRssi()
-                # Передаємо дані в інтерфейс
-                self.ui_callback(address, name, rssi)
-
-            @java_method('(Ljava/util/List;)V')
-            def onBatchScanResults(self, results):
-                pass
-
-            @java_method('(I)V')
-            def onScanFailed(self, errorCode):
-                print(f"Помилка сканування: {errorCode}")
+            @java_method('(Landroid/bluetooth/BluetoothDevice;I[B)V')
+            def onLeScan(self, device, rssi, scanRecord):
+                if device:
+                    address = device.getAddress()
+                    name = device.getName()
+                    # Передаємо дані в інтерфейс
+                    self.ui_callback(address, name, rssi)
 
     def get_config_path():
         return os.path.join(App.get_running_app().user_data_dir, "anti_lost_config.json")
@@ -72,13 +62,11 @@ try:
             if self.alarm_sound:
                 self.alarm_sound.loop = True
                 
-            # Ініціалізація сканера
-            self.ble_scanner = None
+            # Ініціалізація Bluetooth адаптера
+            self.bluetooth_adapter = None
             self.scan_callback = None
             if platform == "android":
-                adapter = BluetoothAdapter.getDefaultAdapter()
-                if adapter:
-                    self.ble_scanner = adapter.getBluetoothLeScanner()
+                self.bluetooth_adapter = BluetoothAdapter.getDefaultAdapter()
             
             # Пропорційний макет
             layout = BoxLayout(orientation='vertical', padding=30, spacing=15)
@@ -88,7 +76,6 @@ try:
             self.status_label = Label(text="МОНІТОРИНГ ВИМКНЕНО", font_size='18sp', bold=True, color=(0.5, 0.5, 0.5, 1), size_hint_y=0.1)
             layout.add_widget(self.status_label)
 
-            # Блок 1: Сила сигналу
             box_rssi = BoxLayout(orientation='vertical', size_hint_y=0.15)
             box_rssi.add_widget(Label(text="СИЛА СИГНАЛУ (RSSI / ВІДСТАНЬ)", font_size='14sp', bold=True))
             self.rssi_slider = Slider(min=-95, max=-60, value=-85, step=1)
@@ -98,7 +85,6 @@ try:
             box_rssi.add_widget(self.rssi_info)
             layout.add_widget(box_rssi)
 
-            # Блок 2: Інтервал пінгу
             box_ping = BoxLayout(orientation='vertical', size_hint_y=0.15)
             box_ping.add_widget(Label(text="ІНТЕРВАЛ ОПИТУВАННЯ", font_size='14sp', bold=True))
             self.ping_slider = Slider(min=1, max=10, value=2, step=1)
@@ -108,7 +94,6 @@ try:
             box_ping.add_widget(self.ping_info)
             layout.add_widget(box_ping)
 
-            # Блок 3: Затримка тривоги
             box_time = BoxLayout(orientation='vertical', size_hint_y=0.15)
             box_time.add_widget(Label(text="ЗАТРИМКА ТРИВОГИ", font_size='14sp', bold=True))
             self.time_slider = Slider(min=2, max=30, value=5, step=1)
@@ -118,7 +103,6 @@ try:
             box_time.add_widget(self.time_info)
             layout.add_widget(box_time)
 
-            # Блок 4: Тривалість звучання
             box_dur = BoxLayout(orientation='vertical', size_hint_y=0.15)
             box_dur.add_widget(Label(text="ТРИВАЛІСТЬ ЗВУЧАННЯ СИРЕНИ", font_size='14sp', bold=True))
             self.duration_slider = Slider(min=1, max=5, value=2, step=1)
@@ -128,7 +112,6 @@ try:
             box_dur.add_widget(self.duration_info)
             layout.add_widget(box_dur)
 
-            # Кнопки
             self.btn_start = Button(text="УВІМКНУТИ МОНІТОРИНГ", font_size='16sp', bold=True, background_color=(0.2, 0.8, 0.2, 1), size_hint_y=0.1)
             self.btn_start.bind(on_press=self.start_monitoring)
             layout.add_widget(self.btn_start)
@@ -148,7 +131,6 @@ try:
         def on_time_change(self, instance, value): self.time_info.text = f"Час очікування: {int(value)} секунд"
         def on_duration_change(self, instance, value): self.duration_info.text = f"Автовимкнення через: {int(value)} хв"
 
-        # Декоратор mainthread гарантує безпечне оновлення даних
         @mainthread
         def on_device_found(self, address, name, rssi):
             if address == self.target_mac:
@@ -182,9 +164,10 @@ try:
             self.alarm_start_time = None
             self.last_seen_time = time.time()
             
-            if self.ble_scanner:
+            # Запускаємо нативний сканер
+            if self.bluetooth_adapter:
                 self.scan_callback = BLEScanCallback(self.on_device_found)
-                self.ble_scanner.startScan(self.scan_callback)
+                self.bluetooth_adapter.startLeScan(self.scan_callback)
             
             self.monitor_event = Clock.schedule_interval(self.check_status, self.ping_slider.value)
 
@@ -233,8 +216,8 @@ try:
                 self.monitor_event.cancel()
                 self.monitor_event = None
                 
-            if self.ble_scanner and self.scan_callback:
-                self.ble_scanner.stopScan(self.scan_callback)
+            if self.bluetooth_adapter and self.scan_callback:
+                self.bluetooth_adapter.stopLeScan(self.scan_callback)
                 self.scan_callback = None
                 
             if self.alarm_sound and self.alarm_sound.state == 'play':
@@ -261,12 +244,11 @@ try:
             super().__init__(**kwargs)
             self.found_devices = {}
             
-            self.ble_scanner = None
+            # Ініціалізація Bluetooth адаптера
+            self.bluetooth_adapter = None
             self.scan_callback = None
             if platform == "android":
-                adapter = BluetoothAdapter.getDefaultAdapter()
-                if adapter:
-                    self.ble_scanner = adapter.getBluetoothLeScanner()
+                self.bluetooth_adapter = BluetoothAdapter.getDefaultAdapter()
             
             layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
 
@@ -302,7 +284,6 @@ try:
         def on_enter(self):
             self.load_config()
             
-        # Декоратор mainthread гарантує, що кнопка малюється у безпечному потоці!
         @mainthread
         def on_device_found(self, address, name, rssi):
             if address not in self.found_devices:
@@ -317,7 +298,7 @@ try:
                 self.devices_container.height += 105
 
         def start_ble_scan(self, instance):
-            if not self.ble_scanner:
+            if not self.bluetooth_adapter:
                 lbl = Label(text="Помилка: Немає доступу до Bluetooth", font_size='12sp', size_hint_y=None, height=40)
                 self.devices_container.add_widget(lbl)
                 self.devices_container.height += 40
@@ -329,21 +310,22 @@ try:
             self.devices_container.height = 0
             self.found_devices.clear()
             
+            # Запускаємо стабільне нативне сканування
             self.scan_callback = BLEScanCallback(self.on_device_found)
-            self.ble_scanner.startScan(self.scan_callback)
+            self.bluetooth_adapter.startLeScan(self.scan_callback)
             
             Clock.schedule_once(self.stop_ble_scan, 4.0)
 
         def stop_ble_scan(self, dt):
-            if self.ble_scanner and self.scan_callback:
-                self.ble_scanner.stopScan(self.scan_callback)
+            if self.bluetooth_adapter and self.scan_callback:
+                self.bluetooth_adapter.stopLeScan(self.scan_callback)
                 self.scan_callback = None
             
             self.btn_scan.disabled = False
             self.btn_scan.text = "ЗАПУСТИТИ РАДАР ЕФІРУ"
             
             if not self.found_devices:
-                lbl = Label(text="Нічого не знайдено. Увімкніть Bluetooth.", font_size='12sp', size_hint_y=None, height=40)
+                lbl = Label(text="Нічого не знайдено. Увімкніть GPS та Bluetooth.", font_size='12sp', size_hint_y=None, height=40)
                 self.devices_container.add_widget(lbl)
                 self.devices_container.height += 40
 
@@ -373,6 +355,8 @@ try:
             if platform == "android":
                 from android.permissions import request_permissions, Permission
                 request_permissions([
+                    Permission.BLUETOOTH,
+                    Permission.BLUETOOTH_ADMIN,
                     Permission.BLUETOOTH_SCAN,
                     Permission.BLUETOOTH_CONNECT,
                     Permission.ACCESS_FINE_LOCATION,
