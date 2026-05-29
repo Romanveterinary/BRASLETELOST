@@ -23,7 +23,7 @@ try:
     Window.size = (400, 720)
 
     def get_config_path():
-        # ВИПРАВЛЕННЯ 1: На Android зберігаємо конфіг у дозволену системну папку додатка
+        # На Android зберігаємо конфіг у дозволену системну папку додатка
         return os.path.join(App.get_running_app().user_data_dir, "anti_lost_config.json")
 
     class MainScreen(Screen):
@@ -287,7 +287,7 @@ try:
 
     class AntiLostApp(App):
         def build(self):
-            # ВИПРАВЛЕННЯ 2: Системний запит дозволів при старті додатка на Android
+            # Системний запит дозволів при старті додатка на Android
             if platform == "android":
                 from android.permissions import request_permissions, Permission
                 request_permissions([
@@ -304,13 +304,11 @@ try:
             return sm
 
     if __name__ == "__main__":
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(AntiLostApp().async_run(async_lib='asyncio'))
+        # Правильний і єдиний спосіб запуску asyncio у нових версіях Python
+        asyncio.run(AntiLostApp().async_run(async_lib='asyncio'))
 
 except Exception as e:
-    # ВИПРАВЛЕННЯ 3: Глобальний перехоплювач помилок
-    # Якщо щось піде не так (наприклад, не завантажиться бібліотека),
-    # додаток покаже екран з текстом помилки замість тихого вильоту.
+    # Глобальний перехоплювач помилок
     from kivy.app import App
     from kivy.uix.label import Label
     from kivy.uix.scrollview import ScrollView
