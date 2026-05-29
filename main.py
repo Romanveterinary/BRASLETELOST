@@ -19,12 +19,11 @@ try:
     from kivy.utils import platform
     from bleak import BleakScanner
 
-    # ВИПРАВЛЕННЯ: Фіксуємо розмір тільки для ПК, на Android додаток буде на весь екран
+    # Фіксуємо розмір тільки для ПК
     if platform not in ('android', 'ios'):
         Window.size = (400, 720)
 
     def get_config_path():
-        # На Android зберігаємо конфіг у дозволену системну папку додатка
         return os.path.join(App.get_running_app().user_data_dir, "anti_lost_config.json")
 
     class MainScreen(Screen):
@@ -38,52 +37,64 @@ try:
             if self.alarm_sound:
                 self.alarm_sound.loop = True
             
-            layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
+            # Пропорційний макет на весь екран
+            layout = BoxLayout(orientation='vertical', padding=30, spacing=15)
 
-            layout.add_widget(Label(text="VET-TRACK: ANTI-LOST", font_size='22sp', bold=True, size_hint_y=None, height=40))
+            layout.add_widget(Label(text="VET-TRACK: ANTI-LOST", font_size='24sp', bold=True, size_hint_y=0.1))
 
-            self.status_label = Label(text="МОНІТОРИНГ ВИМКНЕНО", font_size='18sp', bold=True, color=(0.5, 0.5, 0.5, 1), size_hint_y=None, height=40)
+            self.status_label = Label(text="МОНІТОРИНГ ВИМКНЕНО", font_size='18sp', bold=True, color=(0.5, 0.5, 0.5, 1), size_hint_y=0.1)
             layout.add_widget(self.status_label)
 
-            layout.add_widget(Label(text="🎚️ СИЛА СИГНАЛУ (RSSI / ВІДСТАНЬ)", font_size='13sp', size_hint_y=None, height=18))
-            self.rssi_slider = Slider(min=-95, max=-60, value=-85, step=1, size_hint_y=None, height=25)
+            # Блок 1: Сила сигналу
+            box_rssi = BoxLayout(orientation='vertical', size_hint_y=0.15)
+            box_rssi.add_widget(Label(text="СИЛА СИГНАЛУ (RSSI / ВІДСТАНЬ)", font_size='14sp', bold=True))
+            self.rssi_slider = Slider(min=-95, max=-60, value=-85, step=1)
             self.rssi_slider.bind(value=self.on_rssi_change)
-            self.rssi_info = Label(text="Поріг спрацювання: -85 dBm (~15м)", font_size='11sp', color=(0.7, 0.7, 0.7, 1), size_hint_y=None, height=15)
-            layout.add_widget(self.rssi_slider)
-            layout.add_widget(self.rssi_info)
+            self.rssi_info = Label(text="Поріг спрацювання: -85 dBm (~15м)", font_size='12sp', color=(0.7, 0.7, 0.7, 1))
+            box_rssi.add_widget(self.rssi_slider)
+            box_rssi.add_widget(self.rssi_info)
+            layout.add_widget(box_rssi)
 
-            layout.add_widget(Label(text="⏱️ ІНТЕРВАЛ ПІНГУ (ЧАСТОТА ОПИТУВАННЯ)", font_size='13sp', size_hint_y=None, height=18))
-            self.ping_slider = Slider(min=1, max=10, value=2, step=1, size_hint_y=None, height=25)
+            # Блок 2: Інтервал пінгу
+            box_ping = BoxLayout(orientation='vertical', size_hint_y=0.15)
+            box_ping.add_widget(Label(text="ІНТЕРВАЛ ОПИТУВАННЯ", font_size='14sp', bold=True))
+            self.ping_slider = Slider(min=1, max=10, value=2, step=1)
             self.ping_slider.bind(value=self.on_ping_change)
-            self.ping_info = Label(text="Перевірка кожні: 2 сек", font_size='11sp', color=(0.7, 0.7, 0.7, 1), size_hint_y=None, height=15)
-            layout.add_widget(self.ping_slider)
-            layout.add_widget(self.ping_info)
+            self.ping_info = Label(text="Перевірка кожні: 2 сек", font_size='12sp', color=(0.7, 0.7, 0.7, 1))
+            box_ping.add_widget(self.ping_slider)
+            box_ping.add_widget(self.ping_info)
+            layout.add_widget(box_ping)
 
-            layout.add_widget(Label(text="⏳ ЧАС ВІДПОВІДІ (ЗАТРИМКА ТРИВОГИ)", font_size='13sp', size_hint_y=None, height=18))
-            self.time_slider = Slider(min=2, max=30, value=5, step=1, size_hint_y=None, height=25)
+            # Блок 3: Затримка тривоги
+            box_time = BoxLayout(orientation='vertical', size_hint_y=0.15)
+            box_time.add_widget(Label(text="ЗАТРИМКА ТРИВОГИ", font_size='14sp', bold=True))
+            self.time_slider = Slider(min=2, max=30, value=5, step=1)
             self.time_slider.bind(value=self.on_time_change)
-            self.time_info = Label(text="Час очікування: 5 секунд", font_size='11sp', color=(0.7, 0.7, 0.7, 1), size_hint_y=None, height=15)
-            layout.add_widget(self.time_slider)
-            layout.add_widget(self.time_info)
+            self.time_info = Label(text="Час очікування: 5 секунд", font_size='12sp', color=(0.7, 0.7, 0.7, 1))
+            box_time.add_widget(self.time_slider)
+            box_time.add_widget(self.time_info)
+            layout.add_widget(box_time)
 
-            layout.add_widget(Label(text="🔔 ТРИВАЛІСТЬ ЗВУЧАННЯ ТРИВОГИ", font_size='13sp', size_hint_y=None, height=18))
-            self.duration_slider = Slider(min=1, max=5, value=2, step=1, size_hint_y=None, height=25)
+            # Блок 4: Тривалість звучання
+            box_dur = BoxLayout(orientation='vertical', size_hint_y=0.15)
+            box_dur.add_widget(Label(text="ТРИВАЛІСТЬ ЗВУЧАННЯ СИРЕНИ", font_size='14sp', bold=True))
+            self.duration_slider = Slider(min=1, max=5, value=2, step=1)
             self.duration_slider.bind(value=self.on_duration_change)
-            self.duration_info = Label(text="Автовимкнення через: 2 хв", font_size='11sp', color=(0.7, 0.7, 0.7, 1), size_hint_y=None, height=15)
-            layout.add_widget(self.duration_slider)
-            layout.add_widget(self.duration_info)
+            self.duration_info = Label(text="Автовимкнення через: 2 хв", font_size='12sp', color=(0.7, 0.7, 0.7, 1))
+            box_dur.add_widget(self.duration_slider)
+            box_dur.add_widget(self.duration_info)
+            layout.add_widget(box_dur)
 
-            layout.add_widget(BoxLayout(size_hint_y=None, height=5))
-
-            self.btn_start = Button(text="🟢 УВІМКНУТИ", font_size='16sp', bold=True, background_color=(0.2, 0.8, 0.2, 1), size_hint_y=None, height=48)
+            # Кнопки
+            self.btn_start = Button(text="УВІМКНУТИ МОНІТОРИНГ", font_size='16sp', bold=True, background_color=(0.2, 0.8, 0.2, 1), size_hint_y=0.1)
             self.btn_start.bind(on_press=self.start_monitoring)
             layout.add_widget(self.btn_start)
 
-            self.btn_stop = Button(text="🔴 ВИМКНУТИ", font_size='16sp', bold=True, background_color=(0.8, 0.2, 0.2, 1), size_hint_y=None, height=48, disabled=True)
+            self.btn_stop = Button(text="ВИМКНУТИ МОНІТОРИНГ", font_size='16sp', bold=True, background_color=(0.8, 0.2, 0.2, 1), size_hint_y=0.1, disabled=True)
             self.btn_stop.bind(on_press=self.stop_monitoring)
             layout.add_widget(self.btn_stop)
 
-            btn_settings = Button(text="⚙️ НАЛАШТУВАННЯ ПРИСТРОЮ", font_size='14sp', background_color=(0.3, 0.3, 0.3, 1), size_hint_y=None, height=42)
+            btn_settings = Button(text="НАЛАШТУВАННЯ ПРИСТРОЮ", font_size='14sp', background_color=(0.3, 0.3, 0.3, 1), size_hint_y=0.1)
             btn_settings.bind(on_press=self.go_to_settings)
             layout.add_widget(btn_settings)
 
@@ -99,6 +110,7 @@ try:
             self.btn_stop.disabled = False
             self.toggle_sliders(disabled=True)
             
+            self.status_label.font_size = '18sp'
             self.status_label.text = "ПОШУК БРАСЛЕТА..."
             self.status_label.color = (0.2, 0.7, 0.8, 1)
             self.disconnect_start_time = None
@@ -114,6 +126,7 @@ try:
                 self.alarm_sound.stop()
                 
             self.status_label.text = "МОНІТОРИНГ ВИМКНЕНО"
+            self.status_label.font_size = '18sp'
             self.status_label.color = (0.5, 0.5, 0.5, 1)
             self.btn_start.disabled = False
             self.btn_stop.disabled = True
@@ -139,7 +152,8 @@ try:
                     pass
 
             if not mac_address:
-                self.status_label.text = "ПОМИЛКА: ВКАЖІТЬ MAC-АДРЕСУ!"
+                self.status_label.text = "СПОЧАТКУ ВИБЕРІТЬ ПРИСТРІЙ В НАЛАШТУВАННЯХ!"
+                self.status_label.font_size = '12sp'
                 self.status_label.color = (1, 0.2, 0.2, 1)
                 self.stop_monitoring(None)
                 return
@@ -157,7 +171,7 @@ try:
                     if self.alarm_start_time and (current_time - self.alarm_start_time >= max_alarm_duration):
                         if self.alarm_sound and self.alarm_sound.state == 'play':
                             self.alarm_sound.stop()
-                        self.status_label.text = "🔇 ТРИВОГА ВИМКНЕНА ЗА ТАЙМАУТОМ"
+                        self.status_label.text = "ТРИВОГА ВИМКНЕНА ЗА ТАЙМАУТОМ"
                         self.status_label.color = (0.7, 0.4, 0.7, 1)
                         await asyncio.sleep(ping_interval)
                         continue
@@ -171,7 +185,7 @@ try:
                         self.status_label.color = (0.9, 0.4, 0.1, 1)
 
                         if elapsed >= timeout_limit:
-                            self.status_label.text = "💥 ТРИВОГА! ПРИСТРІЙ ВІДСУТНІЙ!"
+                            self.status_label.text = "ТРИВОГА! ПРИСТРІЙ ВІДСУТНІЙ!"
                             self.status_label.color = (1, 0, 0, 1)
                             
                             if self.alarm_start_time is None:
@@ -199,30 +213,30 @@ try:
             super().__init__(**kwargs)
             layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
 
-            layout.add_widget(Label(text="⚙️ НАЛАШТУВАННЯ", font_size='20sp', bold=True, size_hint_y=None, height=35))
+            layout.add_widget(Label(text="НАЛАШТУВАННЯ", font_size='20sp', bold=True, size_hint_y=0.1))
 
-            layout.add_widget(Label(text="Bluetooth MAC-адреса:", font_size='14sp', size_hint_y=None, height=20, halign='left'))
-            self.mac_input = TextInput(text="", multiline=False, font_size='14sp', size_hint_y=None, height=35)
+            layout.add_widget(Label(text="Bluetooth MAC-адреса:", font_size='14sp', size_hint_y=0.05, halign='left'))
+            self.mac_input = TextInput(text="", multiline=False, font_size='14sp', size_hint_y=0.1)
             layout.add_widget(self.mac_input)
 
-            layout.add_widget(Label(text="Ключ авторизації (Auth Key):", font_size='14sp', size_hint_y=None, height=20))
-            self.key_input = TextInput(text="", multiline=False, font_size='14sp', size_hint_y=None, height=35)
+            layout.add_widget(Label(text="Ключ авторизації (Auth Key):", font_size='14sp', size_hint_y=0.05))
+            self.key_input = TextInput(text="", multiline=False, font_size='14sp', size_hint_y=0.1)
             layout.add_widget(self.key_input)
 
-            layout.add_widget(Label(text="🔍 БЛЮТУЗ РАДАР (Клікни на пристрій для вибору):", font_size='12sp', color=(0.2, 0.7, 0.8, 1), size_hint_y=None, height=20))
+            layout.add_widget(Label(text="БЛЮТУЗ РАДАР (Клікни на пристрій для вибору):", font_size='12sp', color=(0.2, 0.7, 0.8, 1), size_hint_y=0.05))
             
-            self.scroll_view = ScrollView(size_hint=(1, 1))
+            self.scroll_view = ScrollView(size_hint=(1, 0.35))
             self.devices_container = BoxLayout(orientation='vertical', spacing=5, size_hint_y=None)
             self.devices_container.bind(minimum_height=self.devices_container.setter('height'))
             
             self.scroll_view.add_widget(self.devices_container)
             layout.add_widget(self.scroll_view)
 
-            self.btn_scan = Button(text="📡 ЗАПУСТИТИ РАДАР ЕФІРУ", font_size='14sp', background_color=(0.2, 0.6, 0.8, 1), size_hint_y=None, height=45)
+            self.btn_scan = Button(text="ЗАПУСТИТИ РАДАР ЕФІРУ", font_size='14sp', background_color=(0.2, 0.6, 0.8, 1), size_hint_y=0.1)
             self.btn_scan.bind(on_press=self.start_ble_scan)
             layout.add_widget(self.btn_scan)
 
-            btn_save = Button(text="💾 ЗБЕРЕГТИ КОНФІГ", font_size='16sp', bold=True, background_color=(0.2, 0.8, 0.2, 1), size_hint_y=None, height=50)
+            btn_save = Button(text="ЗБЕРЕГТИ КОНФІГ", font_size='16sp', bold=True, background_color=(0.2, 0.8, 0.2, 1), size_hint_y=0.1)
             btn_save.bind(on_press=self.save_config)
             layout.add_widget(btn_save)
 
@@ -251,7 +265,7 @@ try:
                 else:
                     for d in devices:
                         name = d.name if d.name else "Невідомий пристрій"
-                        btn_text = f"📱 {name} \n[{d.address}] | {d.rssi} dBm"
+                        btn_text = f"{name} \n[{d.address}] | {d.rssi} dBm"
                         
                         dev_btn = ToggleButton(text=btn_text, group='ble_dev', size_hint=(1, None), height=55, font_size='11sp')
                         dev_btn.bind(on_press=lambda inst, addr=d.address: self.select_device(addr))
@@ -263,7 +277,7 @@ try:
                 print(f"Помилка радара: {e}")
             finally:
                 self.btn_scan.disabled = False
-                self.btn_scan.text = "📡 ЗАПУСТИТИ РАДАР ЕФІРУ"
+                self.btn_scan.text = "ЗАПУСТИТИ РАДАР ЕФІРУ"
 
         def select_device(self, address):
             self.mac_input.text = address
@@ -288,7 +302,6 @@ try:
 
     class AntiLostApp(App):
         def build(self):
-            # Системний запит дозволів при старті додатка на Android
             if platform == "android":
                 from android.permissions import request_permissions, Permission
                 request_permissions([
@@ -308,7 +321,6 @@ try:
         asyncio.run(AntiLostApp().async_run(async_lib='asyncio'))
 
 except Exception as e:
-    # Глобальний перехоплювач помилок
     from kivy.app import App
     from kivy.uix.label import Label
     from kivy.uix.scrollview import ScrollView
