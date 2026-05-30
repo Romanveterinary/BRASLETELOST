@@ -1,6 +1,4 @@
-import json
-import os
-import math
+import json, os, math, time
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.boxlayout import BoxLayout
@@ -13,7 +11,6 @@ from kivy.uix.togglebutton import ToggleButton
 from kivy.core.window import Window
 from kivy.utils import platform
 from kivy.clock import Clock, mainthread
-import time
 
 if platform == "android":
     from jnius import autoclass, PythonJavaClass, java_method
@@ -23,44 +20,36 @@ if platform == "android":
     Context = autoclass('android.content.Context')
     Vibrator = autoclass('android.os.Vibrator')
 
-def get_config_path():
-    return os.path.join(App.get_running_app().user_data_dir, "anti_lost_config.json")
+# --- Логіка конфігу ---
+def get_config_path(): return os.path.join(App.get_running_app().user_data_dir, "anti_lost_config.json")
 
-def load_config():
-    default = {"mac_address": "", "rssi_threshold": -85}
+def load_full_config():
+    default = {"mac_address": "", "rssi_threshold": -85, "ping_interval": 2, "timeout_limit": 5, "melody_path": ""}
     if os.path.exists(get_config_path()):
         with open(get_config_path(), "r") as f: return {**default, **json.load(f)}
     return default
 
-class BLEScanCallback(PythonJavaClass):
-    __javainterfaces__ = ['android/bluetooth/BluetoothAdapter$LeScanCallback']
-    __javacontext__ = 'app'
-
-    def __init__(self, callback):
-        super().__init__()
-        self.callback = callback
-
-    @java_method('(Landroid/bluetooth/BluetoothDevice;I[B)V')
-    def onLeScan(self, device, rssi, scanRecord):
-        if device: self.callback(device.getAddress(), rssi)
-
+# --- Основний екран ---
 class MainScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.last_seen = time.time()
         self.is_monitoring = False
-        layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
+        self.last_seen = time.time()
+        self.layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
         
         self.status = Label(text="ОЧІКУВАННЯ...", font_size='20sp')
-        layout.add_widget(self.status)
+        self.layout.add_widget(self.status)
         
         self.btn_toggle = Button(text="ЗАПУСТИТИ МОНІТОРИНГ", size_hint_y=0.2)
         self.btn_toggle.bind(on_press=self.toggle_monitoring)
-        layout.add_widget(self.btn_toggle)
+        self.layout.add_widget(self.btn_toggle)
         
-        self.add_widget(layout)
+        btn_settings = Button(text="НАЛАШТУВАННЯ", size_hint_y=0.1)
+        btn_settings.bind(on_press=lambda x: setattr(self.manager, 'current', 'settings'))
+        self.layout.add_widget(btn_settings)
+        self.add_widget(self.layout)
         
-        # Ініціалізація аудіо
+        # Аудіо
         self.player = MediaPlayer()
         self.player.setAudioStreamType(AudioManager.STREAM_ALARM)
 
@@ -69,33 +58,52 @@ class MainScreen(Screen):
         if self.is_monitoring:
             self.btn_toggle.text = "ЗУПИНИТИ"
             self.adapter = BluetoothAdapter.getDefaultAdapter()
-            self.callback = BLEScanCallback(self.on_ble_found)
+            self.callback = self.BLECallback(self.on_ble_found)
             self.adapter.startLeScan(self.callback)
             Clock.schedule_interval(self.check_status, 1)
         else:
-            self.btn_toggle.text = "ЗАПУСТИТИ"
+            self.btn_toggle.text = "ЗАПУСТИТИ МОНІТОРИНГ"
             Clock.unschedule(self.check_status)
-            self.adapter.stopLeScan(self.callback)
+            if hasattr(self, 'adapter'): self.adapter.stopLeScan(self.callback)
+
+    class BLECallback(PythonJavaClass):
+        __javainterfaces__ = ['android/bluetooth/BluetoothAdapter$LeScanCallback']
+        def __init__(self, callback): super().__init__(); self.callback = callback
+        @java_method('(Landroid/bluetooth/BluetoothDevice;I[B)V')
+        def onLeScan(self, device, rssi, scanRecord): self.callback(device.getAddress(), rssi)
 
     def on_ble_found(self, address, rssi):
-        config = load_config()
-        if address == config.get("mac_address"):
-            self.last_seen = time.time()
+        if address == load_full_config()["mac_address"]: self.last_seen = time.time()
 
     def check_status(self, dt):
-        config = load_config()
-        if (time.time() - self.last_seen) > 5.0:
-            self.status.text = "🚨 ТРИВОГА! ЗВ'ЯЗОК ВТРАЧЕНО"
-            self.status.color = (1, 0, 0, 1)
+        config = load_full_config()
+        if (time.time() - self.last_seen) > config["timeout_limit"]:
+            self.status.text = "🚨 ТРИВОГА!"
             if not self.player.isPlaying(): self.player.start()
         else:
             self.status.text = "🟢 СТАБІЛЬНО"
-            self.status.color = (0, 1, 0, 1)
             if self.player.isPlaying(): self.player.pause()
+
+# --- Екран налаштувань (Повертаємо твій інтерфейс) ---
+class SettingsScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        layout = BoxLayout(orientation='vertical', padding=20)
+        self.mac_input = TextInput(text=load_full_config()["mac_address"], hint_text="MAC-адреса")
+        layout.add_widget(self.mac_input)
+        btn_save = Button(text="ЗБЕРЕГТИ", on_press=self.save)
+        layout.add_widget(btn_save)
+        self.add_widget(layout)
+
+    def save(self, instance):
+        with open(get_config_path(), "w") as f: json.dump({"mac_address": self.mac_input.text}, f)
+        self.manager.current = 'main'
 
 class AntiLostApp(App):
     def build(self):
-        return MainScreen()
+        sm = ScreenManager()
+        sm.add_widget(MainScreen(name='main'))
+        sm.add_widget(SettingsScreen(name='settings'))
+        return sm
 
-if __name__ == "__main__":
-    AntiLostApp().run()
+AntiLostApp().run()
