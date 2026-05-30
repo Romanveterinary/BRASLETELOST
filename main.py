@@ -42,7 +42,6 @@ try:
     def get_config_path():
         return os.path.join(App.get_running_app().user_data_dir, "anti_lost_config.json")
 
-    # Шлях до файлу стану від фонової служби
     def get_state_path():
         return os.path.join(App.get_running_app().user_data_dir, "live_state.json")
 
@@ -89,10 +88,8 @@ try:
             self.status_label = Label(text="ГОТОВИЙ ДО ЗАПУСКУ ФОНУ", font_size='14sp', bold=True, color=(0.5, 0.5, 0.5, 1), size_hint_y=0.1)
             layout.add_widget(self.status_label)
 
-            # --- НОВИЙ ВІЗУАЛЬНИЙ РАДАР (ГАЛЯЧЕ/ХОЛОДНО) ---
             self.target_label = Label(text="ПРИСТРІЙ НЕ ВИБРАНО", font_size='22sp', bold=True, color=(0.2, 0.8, 0.2, 0.2), size_hint_y=0.1)
             layout.add_widget(self.target_label)
-            # -----------------------------------------------
 
             config = load_full_config()
 
@@ -142,17 +139,15 @@ try:
             self.btn_stop.bind(on_press=self.stop_service)
             layout.add_widget(self.btn_stop)
 
-            btn_settings = Button(text="НАЛАШТУВАННЯ ПРИСТРОЮ", font_size='14sp', background_color=(0.3, 0.3, 0.3, 1), size_hint_y=0.1)
-            btn_settings.bind(on_press=self.go_to_settings)
-            layout.add_widget(btn_settings)
+            self.btn_settings = Button(text="НАЛАШТУВАННЯ ПРИСТРОЮ", font_size='14sp', background_color=(0.3, 0.3, 0.3, 1), size_hint_y=0.1)
+            self.btn_settings.bind(on_press=self.go_to_settings)
+            layout.add_widget(self.btn_settings)
 
             self.add_widget(layout)
             
-            # Запускаємо таймер оновлення інтерфейсу (2 рази на секунду)
             Clock.schedule_interval(self.update_live_ui, 0.5)
             self.service_running = False
 
-        # --- ЧИТАННЯ ФАЙЛУ СТАНУ ТА ЗМІНА КОЛЬОРУ ---
         def update_live_ui(self, dt):
             if not self.service_running:
                 return
@@ -175,8 +170,6 @@ try:
                         else:
                             self.status_label.color = (0.8, 0.8, 0.2, 1)
 
-                        # Обчислюємо прозорість: -95 (далеко, ледве видно) до -50 (близько, яскраво)
-                        # Формула переводить діапазон [-100...-50] у [0.1...1.0]
                         alpha = max(0.1, min(1.0, (rssi_val + 100) / 50.0))
                         
                         config = load_full_config()
@@ -210,6 +203,13 @@ try:
                 self.status_label.color = (1, 0.2, 0.2, 1)
                 return
 
+            # --- БЛОКУЄМО ПОВЗУНКИ ---
+            self.rssi_slider.disabled = True
+            self.ping_slider.disabled = True
+            self.time_slider.disabled = True
+            self.duration_slider.disabled = True
+            self.btn_settings.disabled = True
+
             if platform == 'android':
                 try:
                     from jnius import autoclass
@@ -228,7 +228,13 @@ try:
             self.target_label.text = "СЛУЖБА ЗУПИНЕНА"
             self.target_label.color = (0.5, 0.5, 0.5, 0.3)
             
-            # Очищуємо файл статусу, щоб не висіли старі дані
+            # --- РОЗБЛОКОВУЄМО ПОВЗУНКИ ---
+            self.rssi_slider.disabled = False
+            self.ping_slider.disabled = False
+            self.time_slider.disabled = False
+            self.duration_slider.disabled = False
+            self.btn_settings.disabled = False
+
             try:
                 state_file = get_state_path()
                 if os.path.exists(state_file):
@@ -363,11 +369,6 @@ try:
                 "melody_path": self.melody_input.text.strip()
             })
             self.manager.current = 'main'
-
-        def load_config(self):
-            config = load_full_config()
-            self.mac_input.text = config.get("mac_address", "")
-            self.melody_input.text = config.get("melody_path", "")
 
     class AntiLostApp(App):
         def build(self):
