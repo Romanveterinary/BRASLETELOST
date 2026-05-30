@@ -3,6 +3,7 @@ import traceback
 try:
     import json
     import os
+    import math
     from kivy.app import App
     from kivy.uix.screenmanager import ScreenManager, Screen
     from kivy.uix.boxlayout import BoxLayout
@@ -16,11 +17,9 @@ try:
     from kivy.utils import platform
     from kivy.clock import Clock, mainthread
 
-    # Фіксуємо розмір тільки для ПК
     if platform not in ('android', 'ios'):
         Window.size = (400, 720)
 
-    # Налаштування Bluetooth тільки для "Радара" в налаштуваннях
     if platform == "android":
         from jnius import autoclass, PythonJavaClass, java_method
         BluetoothAdapter = autoclass('android.bluetooth.BluetoothAdapter')
@@ -43,7 +42,6 @@ try:
     def get_config_path():
         return os.path.join(App.get_running_app().user_data_dir, "anti_lost_config.json")
 
-    # Універсальна функція завантаження конфігу
     def load_full_config():
         default_config = {
             "mac_address": "",
@@ -63,12 +61,20 @@ try:
                 pass
         return default_config
 
-    # Універсальна функція збереження конфігу
     def save_full_config(data):
         config = load_full_config()
         config.update(data)
         with open(get_config_path(), "w") as f:
             json.dump(config, f)
+
+    # Функція розрахунку метрів
+    def calc_distance(rssi):
+        tx_power = -59
+        n = 2.5
+        if rssi == 0:
+            return 0.0
+        distance = math.pow(10, (tx_power - rssi) / (10 * n))
+        return round(distance, 1)
 
     class MainScreen(Screen):
         def __init__(self, **kwargs):
@@ -77,17 +83,18 @@ try:
 
             layout.add_widget(Label(text="VET-TRACK: ANTI-LOST", font_size='24sp', bold=True, size_hint_y=0.1))
 
-            self.status_label = Label(text="ГОТОВИЙ ДО ЗАПУСКУ ФОНУ", font_size='16sp', bold=True, color=(0.5, 0.5, 0.5, 1), size_hint_y=0.1)
+            self.status_label = Label(text="ГОТОВИЙ ДО ЗАПУСКУ ФОНУ", font_size='14sp', bold=True, color=(0.5, 0.5, 0.5, 1), size_hint_y=0.1)
             layout.add_widget(self.status_label)
 
-            # Завантажуємо попередні налаштування повзунків
             config = load_full_config()
 
             box_rssi = BoxLayout(orientation='vertical', size_hint_y=0.15)
             box_rssi.add_widget(Label(text="СИЛА СИГНАЛУ (RSSI / ВІДСТАНЬ)", font_size='14sp', bold=True))
             self.rssi_slider = Slider(min=-95, max=-60, value=config["rssi_threshold"], step=1)
             self.rssi_slider.bind(value=self.on_rssi_change)
-            self.rssi_info = Label(text=f"Поріг: {int(self.rssi_slider.value)} dBm", font_size='12sp', color=(0.7, 0.7, 0.7, 1))
+            
+            init_dist = calc_distance(self.rssi_slider.value)
+            self.rssi_info = Label(text=f"Поріг: {int(self.rssi_slider.value)} dBm (~{init_dist} м)", font_size='12sp', color=(0.7, 0.7, 0.7, 1))
             box_rssi.add_widget(self.rssi_slider)
             box_rssi.add_widget(self.rssi_info)
             layout.add_widget(box_rssi)
@@ -133,13 +140,15 @@ try:
 
             self.add_widget(layout)
 
-        def on_rssi_change(self, instance, value): self.rssi_info.text = f"Поріг: {int(value)} dBm"
+        def on_rssi_change(self, instance, value):
+            dist = calc_distance(value)
+            self.rssi_info.text = f"Поріг: {int(value)} dBm (~{dist} м)"
+            
         def on_ping_change(self, instance, value): self.ping_info.text = f"Кожні: {int(value)} сек"
         def on_time_change(self, instance, value): self.time_info.text = f"Очікування: {int(value)} сек"
         def on_duration_change(self, instance, value): self.duration_info.text = f"Вимкнення через: {int(value)} хв"
 
         def start_service(self, instance):
-            # Зберігаємо всі налаштування з повзунків
             save_full_config({
                 "rssi_threshold": self.rssi_slider.value,
                 "ping_interval": self.ping_slider.value,
@@ -153,27 +162,36 @@ try:
                 self.status_label.color = (1, 0.2, 0.2, 1)
                 return
 
-            self.status_label.text = "СЛУЖБА ПРАЦЮЄ У ФОНІ"
-            self.status_label.color = (0.2, 0.8, 0.2, 1)
-
             if platform == 'android':
-                from jnius import autoclass
-                service = autoclass("com.romanveterinary.vettrack_antilost.ServiceScanner")
-                mActivity = autoclass("org.kivy.android.PythonActivity").mActivity
-                service.start(mActivity, "")
+                try:
+                    from jnius import autoclass
+                    # Після заміни в buildozer.spec клас буде саме таким:
+                    service = autoclass("com.romanveterinary.vettrack_antilost.ServiceScanner")
+                    mActivity = autoclass("org.kivy.android.PythonActivity").mActivity
+                    service.start(mActivity, "")
+                    self.status_label.text = "СЛУЖБА ПРАЦЮЄ У ФОНІ"
+                    self.status_label.color = (0.2, 0.8, 0.2, 1)
+                except Exception as e:
+                    # Захист від падіння. Виводимо помилку текстом на екран.
+                    self.status_label.text = f"Помилка: {str(e)}"
+                    self.status_label.color = (1, 0.2, 0.2, 1)
 
         def stop_service(self, instance):
             self.status_label.text = "ФОНОВУ СЛУЖБУ ЗУПИНЕНО"
             self.status_label.color = (0.5, 0.5, 0.5, 1)
 
             if platform == 'android':
-                from jnius import autoclass
-                service = autoclass("com.romanveterinary.vettrack_antilost.ServiceScanner")
-                mActivity = autoclass("org.kivy.android.PythonActivity").mActivity
-                service.stop(mActivity)
+                try:
+                    from jnius import autoclass
+                    service = autoclass("com.romanveterinary.vettrack_antilost.ServiceScanner")
+                    mActivity = autoclass("org.kivy.android.PythonActivity").mActivity
+                    service.stop(mActivity)
+                except Exception:
+                    pass
 
         def go_to_settings(self, instance):
             self.manager.current = 'settings'
+
 
     class SettingsScreen(Screen):
         def __init__(self, **kwargs):
@@ -193,7 +211,6 @@ try:
             self.mac_input = TextInput(text="", multiline=False, font_size='14sp', size_hint_y=0.1)
             layout.add_widget(self.mac_input)
 
-            # --- ВИБІР МЕЛОДІЇ ---
             layout.add_widget(Label(text="Власна мелодія (пусто = стандартна):", font_size='14sp', size_hint_y=0.05))
             box_melody = BoxLayout(orientation='horizontal', size_hint_y=0.1, spacing=5)
             self.melody_input = TextInput(text="", multiline=False, font_size='12sp', size_hint_x=0.7)
@@ -202,7 +219,6 @@ try:
             box_melody.add_widget(self.melody_input)
             box_melody.add_widget(btn_choose_melody)
             layout.add_widget(box_melody)
-            # ---------------------------------
 
             layout.add_widget(Label(text="БЛЮТУЗ РАДАР (Клікни на пристрій):", font_size='12sp', color=(0.2, 0.7, 0.8, 1), size_hint_y=0.05))
             
@@ -243,7 +259,10 @@ try:
             if address not in self.found_devices:
                 self.found_devices[address] = True
                 dev_name = name if name else "Невідомий пристрій"
-                btn_text = f"{dev_name} \n[{address}] | {rssi} dBm"
+                
+                # Додаємо метри до радара пошуку
+                dist = calc_distance(rssi)
+                btn_text = f"{dev_name} \n[{address}] | {rssi} dBm (~{dist} м)"
                 
                 dev_btn = ToggleButton(text=btn_text, group='ble_dev', size_hint=(1, None), height=100, font_size='14sp')
                 dev_btn.bind(on_press=lambda inst, addr=address: self.select_device(addr))
