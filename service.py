@@ -8,12 +8,14 @@ service_context = PythonService.mService
 BluetoothAdapter = autoclass('android.bluetooth.BluetoothAdapter')
 MediaPlayer = autoclass('android.media.MediaPlayer')
 AudioManager = autoclass('android.media.AudioManager')
+Vibrator = service_context.getSystemService(autoclass('android.content.Context').VIBRATOR_SERVICE)
 
-# Файли залишаються тими ж
+# Шляхи до файлів
 files_dir = service_context.getFilesDir().getAbsolutePath()
 CONFIG_FILE = os.path.join(files_dir, "anti_lost_config.json")
 STATE_FILE = os.path.join(files_dir, "live_state.json")
 
+# Глобальні змінні
 last_seen_time = time.time()
 last_seen_rssi = -100
 
@@ -32,28 +34,31 @@ class BLEScanCallback(PythonJavaClass):
             last_seen_time = time.time()
             last_seen_rssi = rssi
 
-def load_config():
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, "r") as f: return json.load(f)
-        except: pass
-    return {"mac_address": "", "rssi_threshold": -85, "ping_interval": 2, "timeout_limit": 5, "alarm_duration": 2}
-
-def write_state(status, rssi):
-    try:
-        with open(STATE_FILE, "w") as f: json.dump({"status": status, "rssi": rssi}, f)
-    except: pass
+def play_alarm(player):
+    # Встановлюємо гучність на максимум
+    audio_manager = service_context.getSystemService(autoclass('android.content.Context').AUDIO_SERVICE)
+    audio_manager.setStreamVolume(AudioManager.STREAM_ALARM, audio_manager.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0)
+    
+    player.start()
+    # Вібро (патерн: 0мс затримки, 500мс вібро, 500мс пауза)
+    if Vibrator:
+        Vibrator.vibrate(500)
 
 def main():
     global last_seen_time, last_seen_rssi
-    config = load_config()
-    target_mac = config.get("mac_address", "").strip()
     
+    # Завантажуємо конфіг
+    config = {}
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as f: config = json.load(f)
+    
+    target_mac = config.get("mac_address", "").strip()
     adapter = BluetoothAdapter.getDefaultAdapter()
     adapter.startLeScan(BLEScanCallback(target_mac))
     
+    # Ініціалізація плеєра
     player = MediaPlayer()
-    # Спробуємо програти стандартний звук тривоги
+    player.setAudioStreamType(AudioManager.STREAM_ALARM)
     try:
         from android.media import RingtoneManager
         uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
@@ -63,32 +68,23 @@ def main():
     except: pass
 
     alarm_playing = False
-    disconnect_time = None
-
+    
     while True:
-        current_time = time.time()
-        config = load_config()
-        
-        is_lost = (current_time - last_seen_time) > 3.0 or last_seen_rssi < config["rssi_threshold"]
+        time.sleep(2)
+        is_lost = (time.time() - last_seen_time) > 3.0
         
         if is_lost:
-            if disconnect_time is None: disconnect_time = current_time
-            elapsed = current_time - disconnect_time
-            
-            if elapsed >= config["timeout_limit"]:
-                if not alarm_playing:
-                    try: player.start(); alarm_playing = True
-                    except: pass
-            status = "🚨 ТРИВОГА!"
+            if not alarm_playing:
+                play_alarm(player)
+                alarm_playing = True
+            # Запис статусу
+            with open(STATE_FILE, "w") as f: json.dump({"status": "🚨 ТРИВОГА!", "rssi": last_seen_rssi}, f)
         else:
-            status = "🟢 СТАБІЛЬНО"
             if alarm_playing:
-                try: player.pause(); player.seekTo(0); alarm_playing = False
-                except: pass
-            disconnect_time = None
-
-        write_state(status, last_seen_rssi)
-        time.sleep(config["ping_interval"])
+                player.pause()
+                player.seekTo(0)
+                alarm_playing = False
+            with open(STATE_FILE, "w") as f: json.dump({"status": "🟢 СТАБІЛЬНО", "rssi": last_seen_rssi}, f)
 
 if __name__ == '__main__':
     main()
