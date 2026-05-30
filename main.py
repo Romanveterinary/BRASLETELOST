@@ -3,7 +3,6 @@ import traceback
 try:
     import json
     import os
-    import time
     from kivy.app import App
     from kivy.uix.screenmanager import ScreenManager, Screen
     from kivy.uix.boxlayout import BoxLayout
@@ -14,7 +13,6 @@ try:
     from kivy.uix.scrollview import ScrollView
     from kivy.uix.togglebutton import ToggleButton
     from kivy.core.window import Window
-    from kivy.core.audio import SoundLoader
     from kivy.utils import platform
     from kivy.clock import Clock, mainthread
 
@@ -22,13 +20,11 @@ try:
     if platform not in ('android', 'ios'):
         Window.size = (400, 720)
 
-    # Налаштування нативного Bluetooth для Android через інтерфейс LeScanCallback
+    # Налаштування Bluetooth тільки для "Радара" в налаштуваннях
     if platform == "android":
         from jnius import autoclass, PythonJavaClass, java_method
-        
         BluetoothAdapter = autoclass('android.bluetooth.BluetoothAdapter')
         
-        # Створюємо Python-клас, який виконує роль Java-інтерфейсу
         class BLEScanCallback(PythonJavaClass):
             __javainterfaces__ = ['android/bluetooth/BluetoothAdapter$LeScanCallback']
             __javacontext__ = 'app'
@@ -42,82 +38,93 @@ try:
                 if device:
                     address = device.getAddress()
                     name = device.getName()
-                    # Передаємо дані в інтерфейс
                     self.ui_callback(address, name, rssi)
 
     def get_config_path():
         return os.path.join(App.get_running_app().user_data_dir, "anti_lost_config.json")
 
+    # Універсальна функція завантаження конфігу
+    def load_full_config():
+        default_config = {
+            "mac_address": "",
+            "rssi_threshold": -85,
+            "ping_interval": 2,
+            "timeout_limit": 5,
+            "alarm_duration": 2,
+            "melody_path": ""
+        }
+        config_file = get_config_path()
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, "r") as f:
+                    data = json.load(f)
+                    default_config.update(data)
+            except Exception:
+                pass
+        return default_config
+
+    # Універсальна функція збереження конфігу
+    def save_full_config(data):
+        config = load_full_config()
+        config.update(data)
+        with open(get_config_path(), "w") as f:
+            json.dump(config, f)
+
     class MainScreen(Screen):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
-            self.monitor_event = None  
-            self.disconnect_start_time = None
-            self.alarm_start_time = None  
-            self.target_mac = ""
-            self.last_seen_time = 0
-            self.last_seen_rssi = -100
-            
-            self.alarm_sound = SoundLoader.load('sonar.wav')
-            if self.alarm_sound:
-                self.alarm_sound.loop = True
-                
-            # Ініціалізація Bluetooth адаптера
-            self.bluetooth_adapter = None
-            self.scan_callback = None
-            if platform == "android":
-                self.bluetooth_adapter = BluetoothAdapter.getDefaultAdapter()
-            
-            # Пропорційний макет
             layout = BoxLayout(orientation='vertical', padding=30, spacing=15)
 
             layout.add_widget(Label(text="VET-TRACK: ANTI-LOST", font_size='24sp', bold=True, size_hint_y=0.1))
 
-            self.status_label = Label(text="МОНІТОРИНГ ВИМКНЕНО", font_size='18sp', bold=True, color=(0.5, 0.5, 0.5, 1), size_hint_y=0.1)
+            self.status_label = Label(text="ГОТОВИЙ ДО ЗАПУСКУ ФОНУ", font_size='16sp', bold=True, color=(0.5, 0.5, 0.5, 1), size_hint_y=0.1)
             layout.add_widget(self.status_label)
+
+            # Завантажуємо попередні налаштування повзунків
+            config = load_full_config()
 
             box_rssi = BoxLayout(orientation='vertical', size_hint_y=0.15)
             box_rssi.add_widget(Label(text="СИЛА СИГНАЛУ (RSSI / ВІДСТАНЬ)", font_size='14sp', bold=True))
-            self.rssi_slider = Slider(min=-95, max=-60, value=-85, step=1)
+            self.rssi_slider = Slider(min=-95, max=-60, value=config["rssi_threshold"], step=1)
             self.rssi_slider.bind(value=self.on_rssi_change)
-            self.rssi_info = Label(text="Поріг спрацювання: -85 dBm (~15м)", font_size='12sp', color=(0.7, 0.7, 0.7, 1))
+            self.rssi_info = Label(text=f"Поріг: {int(self.rssi_slider.value)} dBm", font_size='12sp', color=(0.7, 0.7, 0.7, 1))
             box_rssi.add_widget(self.rssi_slider)
             box_rssi.add_widget(self.rssi_info)
             layout.add_widget(box_rssi)
 
             box_ping = BoxLayout(orientation='vertical', size_hint_y=0.15)
             box_ping.add_widget(Label(text="ІНТЕРВАЛ ОПИТУВАННЯ", font_size='14sp', bold=True))
-            self.ping_slider = Slider(min=1, max=10, value=2, step=1)
+            self.ping_slider = Slider(min=1, max=10, value=config["ping_interval"], step=1)
             self.ping_slider.bind(value=self.on_ping_change)
-            self.ping_info = Label(text="Перевірка кожні: 2 сек", font_size='12sp', color=(0.7, 0.7, 0.7, 1))
+            self.ping_info = Label(text=f"Кожні: {int(self.ping_slider.value)} сек", font_size='12sp', color=(0.7, 0.7, 0.7, 1))
             box_ping.add_widget(self.ping_slider)
             box_ping.add_widget(self.ping_info)
             layout.add_widget(box_ping)
 
             box_time = BoxLayout(orientation='vertical', size_hint_y=0.15)
             box_time.add_widget(Label(text="ЗАТРИМКА ТРИВОГИ", font_size='14sp', bold=True))
-            self.time_slider = Slider(min=2, max=30, value=5, step=1)
+            self.time_slider = Slider(min=2, max=30, value=config["timeout_limit"], step=1)
             self.time_slider.bind(value=self.on_time_change)
-            self.time_info = Label(text="Час очікування: 5 секунд", font_size='12sp', color=(0.7, 0.7, 0.7, 1))
+            self.time_info = Label(text=f"Очікування: {int(self.time_slider.value)} сек", font_size='12sp', color=(0.7, 0.7, 0.7, 1))
             box_time.add_widget(self.time_slider)
             box_time.add_widget(self.time_info)
             layout.add_widget(box_time)
 
             box_dur = BoxLayout(orientation='vertical', size_hint_y=0.15)
-            box_dur.add_widget(Label(text="ТРИВАЛІСТЬ ЗВУЧАННЯ СИРЕНИ", font_size='14sp', bold=True))
-            self.duration_slider = Slider(min=1, max=5, value=2, step=1)
+            box_dur.add_widget(Label(text="ТРИВАЛІСТЬ СИРЕНИ", font_size='14sp', bold=True))
+            self.duration_slider = Slider(min=1, max=5, value=config["alarm_duration"], step=1)
             self.duration_slider.bind(value=self.on_duration_change)
-            self.duration_info = Label(text="Автовимкнення через: 2 хв", font_size='12sp', color=(0.7, 0.7, 0.7, 1))
+            self.duration_info = Label(text=f"Вимкнення через: {int(self.duration_slider.value)} хв", font_size='12sp', color=(0.7, 0.7, 0.7, 1))
             box_dur.add_widget(self.duration_slider)
             box_dur.add_widget(self.duration_info)
             layout.add_widget(box_dur)
 
-            self.btn_start = Button(text="УВІМКНУТИ МОНІТОРИНГ", font_size='16sp', bold=True, background_color=(0.2, 0.8, 0.2, 1), size_hint_y=0.1)
-            self.btn_start.bind(on_press=self.start_monitoring)
+            self.btn_start = Button(text="ЗАПУСТИТИ СЛУЖБУ", font_size='16sp', bold=True, background_color=(0.2, 0.8, 0.2, 1), size_hint_y=0.1)
+            self.btn_start.bind(on_press=self.start_service)
             layout.add_widget(self.btn_start)
 
-            self.btn_stop = Button(text="ВИМКНУТИ МОНІТОРИНГ", font_size='16sp', bold=True, background_color=(0.8, 0.2, 0.2, 1), size_hint_y=0.1, disabled=True)
-            self.btn_stop.bind(on_press=self.stop_monitoring)
+            self.btn_stop = Button(text="ЗУПИНИТИ СЛУЖБУ", font_size='16sp', bold=True, background_color=(0.8, 0.2, 0.2, 1), size_hint_y=0.1)
+            self.btn_stop.bind(on_press=self.stop_service)
             layout.add_widget(self.btn_stop)
 
             btn_settings = Button(text="НАЛАШТУВАННЯ ПРИСТРОЮ", font_size='14sp', background_color=(0.3, 0.3, 0.3, 1), size_hint_y=0.1)
@@ -126,115 +133,44 @@ try:
 
             self.add_widget(layout)
 
-        def on_rssi_change(self, instance, value): self.rssi_info.text = f"Поріг спрацювання: {int(value)} dBm"
-        def on_ping_change(self, instance, value): self.ping_info.text = f"Перевірка кожні: {int(value)} сек"
-        def on_time_change(self, instance, value): self.time_info.text = f"Час очікування: {int(value)} секунд"
-        def on_duration_change(self, instance, value): self.duration_info.text = f"Автовимкнення через: {int(value)} хв"
+        def on_rssi_change(self, instance, value): self.rssi_info.text = f"Поріг: {int(value)} dBm"
+        def on_ping_change(self, instance, value): self.ping_info.text = f"Кожні: {int(value)} сек"
+        def on_time_change(self, instance, value): self.time_info.text = f"Очікування: {int(value)} сек"
+        def on_duration_change(self, instance, value): self.duration_info.text = f"Вимкнення через: {int(value)} хв"
 
-        @mainthread
-        def on_device_found(self, address, name, rssi):
-            if address == self.target_mac:
-                self.last_seen_time = time.time()
-                self.last_seen_rssi = rssi
+        def start_service(self, instance):
+            # Зберігаємо всі налаштування з повзунків
+            save_full_config({
+                "rssi_threshold": self.rssi_slider.value,
+                "ping_interval": self.ping_slider.value,
+                "timeout_limit": self.time_slider.value,
+                "alarm_duration": self.duration_slider.value
+            })
 
-        def start_monitoring(self, instance):
-            self.target_mac = ""
-            config_file = get_config_path()
-            if os.path.exists(config_file):
-                try:
-                    with open(config_file, "r") as f:
-                        self.target_mac = json.load(f).get("mac_address", "").strip()
-                except Exception:
-                    pass
-
-            if not self.target_mac:
-                self.status_label.text = "СПОЧАТКУ ВИБЕРІТЬ ПРИСТРІЙ В НАЛАШТУВАННЯХ!"
-                self.status_label.font_size = '12sp'
+            config = load_full_config()
+            if not config.get("mac_address"):
+                self.status_label.text = "СПОЧАТКУ ВИБЕРІТЬ ПРИСТРІЙ!"
                 self.status_label.color = (1, 0.2, 0.2, 1)
                 return
 
-            self.btn_start.disabled = True
-            self.btn_stop.disabled = False
-            self.toggle_sliders(disabled=True)
-            
-            self.status_label.font_size = '18sp'
-            self.status_label.text = "ПОШУК БРАСЛЕТА..."
-            self.status_label.color = (0.2, 0.7, 0.8, 1)
-            self.disconnect_start_time = None
-            self.alarm_start_time = None
-            self.last_seen_time = time.time()
-            
-            # Запускаємо нативний сканер
-            if self.bluetooth_adapter:
-                self.scan_callback = BLEScanCallback(self.on_device_found)
-                self.bluetooth_adapter.startLeScan(self.scan_callback)
-            
-            self.monitor_event = Clock.schedule_interval(self.check_status, self.ping_slider.value)
+            self.status_label.text = "СЛУЖБА ПРАЦЮЄ У ФОНІ"
+            self.status_label.color = (0.2, 0.8, 0.2, 1)
 
-        def check_status(self, dt):
-            current_time = time.time()
-            target_rssi = self.rssi_slider.value
-            timeout_limit = self.time_slider.value
-            max_alarm_duration = self.duration_slider.value * 60
+            if platform == 'android':
+                from jnius import autoclass
+                service = autoclass("com.romanveterinary.vettrack_antilost.ServiceScanner")
+                mActivity = autoclass("org.kivy.android.PythonActivity").mActivity
+                service.start(mActivity, "")
 
-            if self.alarm_start_time and (current_time - self.alarm_start_time >= max_alarm_duration):
-                if self.alarm_sound and self.alarm_sound.state == 'play':
-                    self.alarm_sound.stop()
-                self.status_label.text = "ТРИВОГА ВИМКНЕНА ЗА ТАЙМАУТОМ"
-                self.status_label.color = (0.7, 0.4, 0.7, 1)
-                return
-
-            device_missing = (current_time - self.last_seen_time) > 2.0
-            
-            if device_missing or self.last_seen_rssi < target_rssi:
-                if self.disconnect_start_time is None:
-                    self.disconnect_start_time = current_time
-                
-                elapsed = current_time - self.disconnect_start_time
-                self.status_label.text = f"ВТРАТА ЗВ'ЯЗКУ! ({int(elapsed)}с)"
-                self.status_label.color = (0.9, 0.4, 0.1, 1)
-
-                if elapsed >= timeout_limit:
-                    self.status_label.text = "ТРИВОГА! ПРИСТРІЙ ВІДСУТНІЙ!"
-                    self.status_label.color = (1, 0, 0, 1)
-                    
-                    if self.alarm_start_time is None:
-                        self.alarm_start_time = current_time 
-                    
-                    if self.alarm_sound and self.alarm_sound.state == 'stop':
-                        self.alarm_sound.play()
-            else:
-                if self.alarm_sound and self.alarm_sound.state == 'play':
-                    self.alarm_sound.stop()
-                self.disconnect_start_time = None
-                self.alarm_start_time = None
-                self.status_label.text = f"ПРИСТРІЙ ПОРУЧ | Сигнал: {self.last_seen_rssi} dBm"
-                self.status_label.color = (0.2, 0.8, 0.2, 1)
-
-        def stop_monitoring(self, instance):
-            if self.monitor_event:
-                self.monitor_event.cancel()
-                self.monitor_event = None
-                
-            if self.bluetooth_adapter and self.scan_callback:
-                self.bluetooth_adapter.stopLeScan(self.scan_callback)
-                self.scan_callback = None
-                
-            if self.alarm_sound and self.alarm_sound.state == 'play':
-                self.alarm_sound.stop()
-                
-            self.status_label.text = "МОНІТОРИНГ ВИМКНЕНО"
-            self.status_label.font_size = '18sp'
+        def stop_service(self, instance):
+            self.status_label.text = "ФОНОВУ СЛУЖБУ ЗУПИНЕНО"
             self.status_label.color = (0.5, 0.5, 0.5, 1)
-            self.btn_start.disabled = False
-            self.btn_stop.disabled = True
-            self.toggle_sliders(disabled=False)
 
-        def toggle_sliders(self, disabled):
-            self.rssi_slider.disabled = disabled
-            self.ping_slider.disabled = disabled
-            self.time_slider.disabled = disabled
-            self.duration_slider.disabled = disabled
+            if platform == 'android':
+                from jnius import autoclass
+                service = autoclass("com.romanveterinary.vettrack_antilost.ServiceScanner")
+                mActivity = autoclass("org.kivy.android.PythonActivity").mActivity
+                service.stop(mActivity)
 
         def go_to_settings(self, instance):
             self.manager.current = 'settings'
@@ -244,7 +180,6 @@ try:
             super().__init__(**kwargs)
             self.found_devices = {}
             
-            # Ініціалізація Bluetooth адаптера
             self.bluetooth_adapter = None
             self.scan_callback = None
             if platform == "android":
@@ -258,9 +193,16 @@ try:
             self.mac_input = TextInput(text="", multiline=False, font_size='14sp', size_hint_y=0.1)
             layout.add_widget(self.mac_input)
 
-            layout.add_widget(Label(text="Ключ авторизації (Auth Key):", font_size='14sp', size_hint_y=0.05))
-            self.key_input = TextInput(text="", multiline=False, font_size='14sp', size_hint_y=0.1)
-            layout.add_widget(self.key_input)
+            # --- ВИБІР МЕЛОДІЇ ---
+            layout.add_widget(Label(text="Власна мелодія (пусто = стандартна):", font_size='14sp', size_hint_y=0.05))
+            box_melody = BoxLayout(orientation='horizontal', size_hint_y=0.1, spacing=5)
+            self.melody_input = TextInput(text="", multiline=False, font_size='12sp', size_hint_x=0.7)
+            btn_choose_melody = Button(text="ОГЛЯД", font_size='14sp', background_color=(0.4, 0.4, 0.4, 1), size_hint_x=0.3)
+            btn_choose_melody.bind(on_press=self.choose_melody)
+            box_melody.add_widget(self.melody_input)
+            box_melody.add_widget(btn_choose_melody)
+            layout.add_widget(box_melody)
+            # ---------------------------------
 
             layout.add_widget(Label(text="БЛЮТУЗ РАДАР (Клікни на пристрій):", font_size='12sp', color=(0.2, 0.7, 0.8, 1), size_hint_y=0.05))
             
@@ -283,7 +225,19 @@ try:
             
         def on_enter(self):
             self.load_config()
-            
+
+        def choose_melody(self, instance):
+            try:
+                from plyer import filechooser
+                filechooser.open_file(on_selection=self.handle_selection, filters=[("Audio", "*.mp3", "*.wav")])
+            except Exception as e:
+                self.melody_input.text = "Помилка файлового менеджера"
+
+        @mainthread
+        def handle_selection(self, selection):
+            if selection:
+                self.melody_input.text = selection[0]
+                
         @mainthread
         def on_device_found(self, address, name, rssi):
             if address not in self.found_devices:
@@ -310,10 +264,8 @@ try:
             self.devices_container.height = 0
             self.found_devices.clear()
             
-            # Запускаємо стабільне нативне сканування
             self.scan_callback = BLEScanCallback(self.on_device_found)
             self.bluetooth_adapter.startLeScan(self.scan_callback)
-            
             Clock.schedule_once(self.stop_ble_scan, 4.0)
 
         def stop_ble_scan(self, dt):
@@ -325,7 +277,7 @@ try:
             self.btn_scan.text = "ЗАПУСТИТИ РАДАР ЕФІРУ"
             
             if not self.found_devices:
-                lbl = Label(text="Нічого не знайдено. Увімкніть GPS та Bluetooth.", font_size='12sp', size_hint_y=None, height=40)
+                lbl = Label(text="Нічого не знайдено.", font_size='12sp', size_hint_y=None, height=40)
                 self.devices_container.add_widget(lbl)
                 self.devices_container.height += 40
 
@@ -333,22 +285,16 @@ try:
             self.mac_input.text = address
 
         def save_config(self, instance):
-            config_data = {"mac_address": self.mac_input.text.strip(), "auth_key": self.key_input.text.strip()}
-            config_file = get_config_path()
-            with open(config_file, "w") as f:
-                json.dump(config_data, f)
+            save_full_config({
+                "mac_address": self.mac_input.text.strip(),
+                "melody_path": self.melody_input.text.strip()
+            })
             self.manager.current = 'main'
 
         def load_config(self):
-            config_file = get_config_path()
-            if os.path.exists(config_file):
-                try:
-                    with open(config_file, "r") as f:
-                        data = json.load(f)
-                        self.mac_input.text = data.get("mac_address", "")
-                        self.key_input.text = data.get("auth_key", "")
-                except Exception:
-                    pass
+            config = load_full_config()
+            self.mac_input.text = config.get("mac_address", "")
+            self.melody_input.text = config.get("melody_path", "")
 
     class AntiLostApp(App):
         def build(self):
@@ -360,10 +306,12 @@ try:
                     Permission.BLUETOOTH_SCAN,
                     Permission.BLUETOOTH_CONNECT,
                     Permission.ACCESS_FINE_LOCATION,
-                    Permission.ACCESS_COARSE_LOCATION
+                    Permission.ACCESS_COARSE_LOCATION,
+                    Permission.READ_EXTERNAL_STORAGE,  
+                    Permission.READ_MEDIA_AUDIO        
                 ])
 
-            self.title = "VetTrack Anti-Lost Radar"
+            self.title = "VetTrack Anti-Lost"
             sm = ScreenManager()
             sm.add_widget(MainScreen(name='main'))
             sm.add_widget(SettingsScreen(name='settings'))
