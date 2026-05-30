@@ -203,7 +203,6 @@ try:
                 self.status_label.color = (1, 0.2, 0.2, 1)
                 return
 
-            # --- БЛОКУЄМО ПОВЗУНКИ ---
             self.rssi_slider.disabled = True
             self.ping_slider.disabled = True
             self.time_slider.disabled = True
@@ -228,7 +227,6 @@ try:
             self.target_label.text = "СЛУЖБА ЗУПИНЕНА"
             self.target_label.color = (0.5, 0.5, 0.5, 0.3)
             
-            # --- РОЗБЛОКОВУЄМО ПОВЗУНКИ ---
             self.rssi_slider.disabled = False
             self.ping_slider.disabled = False
             self.time_slider.disabled = False
@@ -369,6 +367,13 @@ try:
                 "melody_path": self.melody_input.text.strip()
             })
             self.manager.current = 'main'
+
+        # --- ОСЬ ЦЮ ФУНКЦІЮ Я ВИПАДКОВО ВИДАЛИВ МИНУЛОГО РАЗУ ---
+        def load_config(self):
+            config = load_full_config()
+            self.mac_input.text = config.get("mac_address", "")
+            self.melody_input.text = config.get("melody_path", "")
+        # --------------------------------------------------------
 
     class AntiLostApp(App):
         def build(self):
