@@ -42,6 +42,10 @@ try:
     def get_config_path():
         return os.path.join(App.get_running_app().user_data_dir, "anti_lost_config.json")
 
+    # Шлях до файлу стану від фонової служби
+    def get_state_path():
+        return os.path.join(App.get_running_app().user_data_dir, "live_state.json")
+
     def load_full_config():
         default_config = {
             "mac_address": "",
@@ -67,7 +71,6 @@ try:
         with open(get_config_path(), "w") as f:
             json.dump(config, f)
 
-    # Функція розрахунку метрів
     def calc_distance(rssi):
         tx_power = -59
         n = 2.5
@@ -85,6 +88,11 @@ try:
 
             self.status_label = Label(text="ГОТОВИЙ ДО ЗАПУСКУ ФОНУ", font_size='14sp', bold=True, color=(0.5, 0.5, 0.5, 1), size_hint_y=0.1)
             layout.add_widget(self.status_label)
+
+            # --- НОВИЙ ВІЗУАЛЬНИЙ РАДАР (ГАЛЯЧЕ/ХОЛОДНО) ---
+            self.target_label = Label(text="ПРИСТРІЙ НЕ ВИБРАНО", font_size='22sp', bold=True, color=(0.2, 0.8, 0.2, 0.2), size_hint_y=0.1)
+            layout.add_widget(self.target_label)
+            # -----------------------------------------------
 
             config = load_full_config()
 
@@ -139,6 +147,46 @@ try:
             layout.add_widget(btn_settings)
 
             self.add_widget(layout)
+            
+            # Запускаємо таймер оновлення інтерфейсу (2 рази на секунду)
+            Clock.schedule_interval(self.update_live_ui, 0.5)
+            self.service_running = False
+
+        # --- ЧИТАННЯ ФАЙЛУ СТАНУ ТА ЗМІНА КОЛЬОРУ ---
+        def update_live_ui(self, dt):
+            if not self.service_running:
+                return
+
+            state_file = get_state_path()
+            if os.path.exists(state_file):
+                try:
+                    with open(state_file, "r") as f:
+                        state_data = json.load(f)
+                        
+                        status_text = state_data.get("status", "ОЧІКУВАННЯ...")
+                        rssi_val = state_data.get("rssi", -100)
+                        
+                        self.status_label.text = status_text
+                        
+                        if "ТРИВОГА" in status_text or "ВТРАЧАЮ" in status_text:
+                            self.status_label.color = (1, 0.2, 0.2, 1)
+                        elif "СТАБІЛЬНИЙ" in status_text:
+                            self.status_label.color = (0.2, 0.8, 0.2, 1)
+                        else:
+                            self.status_label.color = (0.8, 0.8, 0.2, 1)
+
+                        # Обчислюємо прозорість: -95 (далеко, ледве видно) до -50 (близько, яскраво)
+                        # Формула переводить діапазон [-100...-50] у [0.1...1.0]
+                        alpha = max(0.1, min(1.0, (rssi_val + 100) / 50.0))
+                        
+                        config = load_full_config()
+                        mac = config.get("mac_address", "НЕВІДОМО")
+                        dist = calc_distance(rssi_val)
+                        
+                        self.target_label.text = f"МЕТА: {mac}\nСигнал: {rssi_val} dBm (~{dist} м)"
+                        self.target_label.color = (0.2, 0.8, 0.2, alpha)
+                except Exception:
+                    pass
 
         def on_rssi_change(self, instance, value):
             dist = calc_distance(value)
@@ -165,20 +213,28 @@ try:
             if platform == 'android':
                 try:
                     from jnius import autoclass
-                    # Після заміни в buildozer.spec клас буде саме таким:
                     service = autoclass("com.romanveterinary.vettrack_antilost.ServiceScanner")
                     mActivity = autoclass("org.kivy.android.PythonActivity").mActivity
                     service.start(mActivity, "")
-                    self.status_label.text = "СЛУЖБА ПРАЦЮЄ У ФОНІ"
-                    self.status_label.color = (0.2, 0.8, 0.2, 1)
+                    self.service_running = True
                 except Exception as e:
-                    # Захист від падіння. Виводимо помилку текстом на екран.
                     self.status_label.text = f"Помилка: {str(e)}"
                     self.status_label.color = (1, 0.2, 0.2, 1)
 
         def stop_service(self, instance):
             self.status_label.text = "ФОНОВУ СЛУЖБУ ЗУПИНЕНО"
             self.status_label.color = (0.5, 0.5, 0.5, 1)
+            self.service_running = False
+            self.target_label.text = "СЛУЖБА ЗУПИНЕНА"
+            self.target_label.color = (0.5, 0.5, 0.5, 0.3)
+            
+            # Очищуємо файл статусу, щоб не висіли старі дані
+            try:
+                state_file = get_state_path()
+                if os.path.exists(state_file):
+                    os.remove(state_file)
+            except:
+                pass
 
             if platform == 'android':
                 try:
@@ -191,7 +247,6 @@ try:
 
         def go_to_settings(self, instance):
             self.manager.current = 'settings'
-
 
     class SettingsScreen(Screen):
         def __init__(self, **kwargs):
@@ -260,7 +315,6 @@ try:
                 self.found_devices[address] = True
                 dev_name = name if name else "Невідомий пристрій"
                 
-                # Додаємо метри до радара пошуку
                 dist = calc_distance(rssi)
                 btn_text = f"{dev_name} \n[{address}] | {rssi} dBm (~{dist} м)"
                 
