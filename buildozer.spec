@@ -28,7 +28,7 @@ orientation = portrait
 fullscreen = 0
 
 # --- РЕЄСТРАЦІЯ ФОНОВОЇ СЛУЖБИ ---
-services = scanner:service.py
+
 
 # (list) Permissions (ДОДАНО ФОНОВІ ДОЗВОЛИ ТА ДОСТУП ДО ФАЙЛІВ)
 android.permissions = BLUETOOTH, BLUETOOTH_ADMIN, BLUETOOTH_SCAN, BLUETOOTH_CONNECT, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, ACCESS_BACKGROUND_LOCATION, WAKE_LOCK, REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, READ_EXTERNAL_STORAGE, READ_MEDIA_AUDIO
