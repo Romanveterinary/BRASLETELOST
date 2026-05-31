@@ -212,10 +212,10 @@ try:
             if platform == 'android':
                 try:
                     from jnius import autoclass
-                    # ВАЖЛИВА ЗМІНА ТУТ: Використовуємо стандартний Kivy сервіс 'scanner' як в buildozer.spec
-                    service = autoclass("org.kivy.android.PythonService")
+                    # ОСЬ ТУТ ВИПРАВЛЕНО: Ми звертаємося до згенерованого класу ServiceScanner
+                    service = autoclass("com.romanveterinary.vettrack_antilost.ServiceScanner")
                     mActivity = autoclass("org.kivy.android.PythonActivity").mActivity
-                    service.start(mActivity, "scanner")
+                    service.start(mActivity, "")
                     self.service_running = True
                     self.status_label.text = "СЛУЖБА ПРАЦЮЄ У ФОНІ"
                     self.status_label.color = (0.2, 0.8, 0.2, 1)
@@ -246,7 +246,8 @@ try:
             if platform == 'android':
                 try:
                     from jnius import autoclass
-                    service = autoclass("org.kivy.android.PythonService")
+                    # ОСЬ ТУТ ВИПРАВЛЕНО ТАКОЖ
+                    service = autoclass("com.romanveterinary.vettrack_antilost.ServiceScanner")
                     mActivity = autoclass("org.kivy.android.PythonActivity").mActivity
                     service.stop(mActivity)
                 except Exception:
