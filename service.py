@@ -42,7 +42,7 @@ STATE_FILE = os.path.join(files_dir, "live_state.json")
 # Глобальні змінні
 last_seen_time = time.time()
 last_seen_rssi = -100
-smoothed_rssi = None # Наш програмний амортизатор
+smoothed_rssi = None # Програмний амортизатор
 
 class BLEScanCallback(PythonJavaClass):
     __javainterfaces__ = ['android/bluetooth/BluetoothAdapter$LeScanCallback']
@@ -60,7 +60,7 @@ class BLEScanCallback(PythonJavaClass):
             if address == self.target_mac:
                 last_seen_time = time.time()
                 
-                # Математичний фільтр (амортизатор)
+                # Математичний фільтр
                 if smoothed_rssi is None:
                     smoothed_rssi = rssi
                 else:
@@ -135,9 +135,14 @@ def main():
         target_rssi = config["rssi_threshold"]
         timeout_limit = config["timeout_limit"]
         max_alarm_duration = config["alarm_duration"] * 60
+        ping_interval = config["ping_interval"]
         
-        # Толерантність до тиші (5 секунд замість 2)
-        device_missing = (current_time - last_seen_time) > 5.0
+        # --- ВИПРАВЛЕННЯ ТУТ ---
+        # Динамічна толерантність до тиші ефіру. 
+        # Даємо системі мінімум 15 секунд або 3х інтервал опитування,
+        # щоб скомпенсувати затримки фонового режиму Android.
+        silence_tolerance = max(15.0, ping_interval * 3.0)
+        device_missing = (current_time - last_seen_time) > silence_tolerance
         
         current_status = "НЕВІДОМО"
         
@@ -184,7 +189,7 @@ def main():
             disconnect_start_time = None
 
         write_state(current_status, last_seen_rssi)
-        time.sleep(config["ping_interval"])
+        time.sleep(ping_interval)
 
 if __name__ == '__main__':
     try:
