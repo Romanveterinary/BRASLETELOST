@@ -142,10 +142,18 @@ try:
             box_btns.add_widget(self.btn_stop)
             layout.add_widget(box_btns)
 
-            # Нова кнопка "Знайти пристрій"
-            self.btn_find = Button(text="ЗНАЙТИ СПАРЕНИЙ ПРИСТРІЙ", font_size='16sp', bold=True, background_color=(0.2, 0.6, 0.8, 1), size_hint_y=0.1)
+            # Кнопки пошуку (Bluetooth та Wi-Fi)
+            box_find_btns = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=0.1)
+            
+            self.btn_find = Button(text="ПОШУК ПРИСТРОЮ", font_size='12sp', bold=True, background_color=(0.2, 0.6, 0.8, 1))
             self.btn_find.bind(on_press=self.go_to_find)
-            layout.add_widget(self.btn_find)
+            
+            self.btn_find_wifi = Button(text="ПОШУК WI-FI", font_size='12sp', bold=True, background_color=(0.8, 0.6, 0.2, 1))
+            self.btn_find_wifi.bind(on_press=self.go_to_wifi_find)
+
+            box_find_btns.add_widget(self.btn_find)
+            box_find_btns.add_widget(self.btn_find_wifi)
+            layout.add_widget(box_find_btns)
 
             self.btn_settings = Button(text="НАЛАШТУВАННЯ", font_size='14sp', background_color=(0.3, 0.3, 0.3, 1), size_hint_y=0.1)
             self.btn_settings.bind(on_press=self.go_to_settings)
@@ -216,7 +224,8 @@ try:
             self.time_slider.disabled = True
             self.duration_slider.disabled = True
             self.btn_settings.disabled = True
-            self.btn_find.disabled = True # Блокуємо пошук під час фонової роботи
+            self.btn_find.disabled = True
+            self.btn_find_wifi.disabled = True
 
             if platform == 'android':
                 try:
@@ -244,6 +253,7 @@ try:
             self.duration_slider.disabled = False
             self.btn_settings.disabled = False
             self.btn_find.disabled = False
+            self.btn_find_wifi.disabled = False
 
             try:
                 state_file = get_state_path()
@@ -272,7 +282,10 @@ try:
                 return
             self.manager.current = 'find_device'
 
-    # НОВИЙ ЕКРАН ПОШУКУ (ГАРЯЧЕ/ХОЛОДНО)
+        def go_to_wifi_find(self, instance):
+            self.manager.current = 'find_wifi'
+
+    # ЕКРАН ПОШУКУ БЛЮТУЗ ПРИСТРОЮ
     class FindScreen(Screen):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
@@ -285,7 +298,7 @@ try:
 
             layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
 
-            self.title_label = Label(text="РАДАР ПОШУКУ", font_size='20sp', bold=True, size_hint_y=0.1)
+            self.title_label = Label(text="РАДАР BLUETOOTH", font_size='20sp', bold=True, size_hint_y=0.1)
             layout.add_widget(self.title_label)
 
             self.distance_label = Label(text="ОЧІКУВАННЯ СИГНАЛУ...", font_size='30sp', bold=True, color=(0.5, 0.5, 0.5, 1), size_hint_y=0.6)
@@ -320,17 +333,16 @@ try:
                 dist = calc_distance(rssi)
                 self.details_label.text = f"Сигнал: {rssi} dBm (~{dist} м)"
 
-                # Логіка "Гаряче-Холодно" з вібрацією
                 if rssi >= -65:
                     self.distance_label.text = "ГАРЯЧЕ!\nВІН ТУТ!"
-                    self.distance_label.color = (1, 0.2, 0.2, 1) # Червоний
+                    self.distance_label.color = (1, 0.2, 0.2, 1)
                     self.vibrate_phone(0.1)
                 elif rssi >= -80:
                     self.distance_label.text = "ТЕПЛО\nБЛИЗЬКО"
-                    self.distance_label.color = (1, 0.8, 0.2, 1) # Жовтий
+                    self.distance_label.color = (1, 0.8, 0.2, 1)
                 else:
                     self.distance_label.text = "ХОЛОДНО\nДАЛЕКО"
-                    self.distance_label.color = (0.2, 0.6, 1, 1) # Синій
+                    self.distance_label.color = (0.2, 0.6, 1, 1)
                     
         def vibrate_phone(self, duration):
             try:
@@ -345,11 +357,96 @@ try:
                 self.scan_callback = None
             self.manager.current = 'main'
 
+    # НОВИЙ ЕКРАН ПОШУКУ WI-FI РОУТЕРА
+    class WifiFindScreen(Screen):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            
+            layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
+
+            self.title_label = Label(text="РАДАР WI-FI РОУТЕРА", font_size='20sp', bold=True, size_hint_y=0.1)
+            layout.add_widget(self.title_label)
+
+            self.distance_label = Label(text="ОЧІКУВАННЯ...", font_size='30sp', bold=True, color=(0.5, 0.5, 0.5, 1), size_hint_y=0.6)
+            layout.add_widget(self.distance_label)
+
+            self.details_label = Label(text="Перевірка з'єднання...", font_size='16sp', color=(0.7, 0.7, 0.7, 1), size_hint_y=0.1)
+            layout.add_widget(self.details_label)
+
+            btn_back = Button(text="ЗУПИНИТИ ПОШУК", font_size='16sp', bold=True, background_color=(0.8, 0.2, 0.2, 1), size_hint_y=0.2)
+            btn_back.bind(on_press=self.stop_search)
+            layout.add_widget(btn_back)
+
+            self.add_widget(layout)
+
+        def on_enter(self):
+            # Запускаємо перевірку Wi-Fi кожну секунду
+            self.check_event = Clock.schedule_interval(self.check_wifi_signal, 1.0)
+
+        def check_wifi_signal(self, dt):
+            if platform != "android":
+                self.details_label.text = "Працює лише на Android"
+                return
+
+            try:
+                from jnius import autoclass
+                PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                Context = autoclass('android.content.Context')
+                
+                wifi_manager = PythonActivity.mActivity.getSystemService(Context.WIFI_SERVICE)
+                wifi_info = wifi_manager.getConnectionInfo()
+                
+                # Якщо Network ID -1, значить телефон не підключений до Wi-Fi
+                network_id = wifi_info.getNetworkId()
+                
+                if network_id == -1:
+                    self.distance_label.text = "НЕМАЄ З'ЄДНАННЯ"
+                    self.distance_label.color = (0.5, 0.5, 0.5, 1)
+                    self.details_label.text = "Підключіться до роутера в налаштуваннях"
+                    return
+
+                rssi = wifi_info.getRssi()
+                ssid = wifi_info.getSSID().replace('"', '') # Прибираємо зайві лапки з назви
+                
+                self.title_label.text = f"ШУКАЮ: {ssid}"
+                self.details_label.text = f"Сигнал: {rssi} dBm"
+
+                # Логіка "Гаряче-Холодно" для Wi-Fi (Wi-Fi сильніший за Bluetooth)
+                if rssi >= -50:
+                    self.distance_label.text = "ГАРЯЧЕ!\nРОУТЕР ТУТ!"
+                    self.distance_label.color = (1, 0.2, 0.2, 1)
+                    self.vibrate_phone(0.1)
+                elif rssi >= -65:
+                    self.distance_label.text = "ТЕПЛО\nУ ЦІЙ КІМНАТІ"
+                    self.distance_label.color = (1, 0.8, 0.2, 1)
+                else:
+                    self.distance_label.text = "ХОЛОДНО\nДАЛЕКО"
+                    self.distance_label.color = (0.2, 0.6, 1, 1)
+                    
+            except Exception as e:
+                self.details_label.text = "Помилка доступу до Wi-Fi"
+
+        def vibrate_phone(self, duration):
+            try:
+                from plyer import vibrator
+                vibrator.vibrate(time=duration)
+            except:
+                pass
+
+        def stop_search(self, instance):
+            if hasattr(self, 'check_event'):
+                self.check_event.cancel()
+            self.manager.current = 'main'
+            
+        def on_leave(self):
+            if hasattr(self, 'check_event'):
+                self.check_event.cancel()
+
     class SettingsScreen(Screen):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
             self.found_devices = {}
-            self.selected_device_name = "Невідомий пристрій" # Додано для збереження назви
+            self.selected_device_name = "Невідомий пристрій" 
             
             self.bluetooth_adapter = None
             self.scan_callback = None
@@ -417,7 +514,6 @@ try:
                 btn_text = f"{dev_name} \n[{address}] | {rssi} dBm (~{dist} м)"
                 
                 dev_btn = ToggleButton(text=btn_text, group='ble_dev', size_hint=(1, None), height=100, font_size='14sp')
-                # Оновлено: тепер ми передаємо і мак, і назву
                 dev_btn.bind(on_press=lambda inst, addr=address, d_name=dev_name: self.select_device(addr, d_name))
                 
                 self.devices_container.add_widget(dev_btn)
@@ -455,7 +551,7 @@ try:
 
         def select_device(self, address, name):
             self.mac_input.text = address
-            self.selected_device_name = name # Зберігаємо назву для радара
+            self.selected_device_name = name 
 
         def save_config(self, instance):
             save_full_config({
@@ -484,14 +580,17 @@ try:
                     Permission.ACCESS_COARSE_LOCATION,
                     Permission.READ_EXTERNAL_STORAGE,  
                     Permission.READ_MEDIA_AUDIO,
-                    Permission.VIBRATE # Додано дозвіл на вібрацію
+                    Permission.VIBRATE,
+                    'android.permission.ACCESS_WIFI_STATE', # Дозвіл на Wi-Fi
+                    'android.permission.ACCESS_NETWORK_STATE'
                 ])
 
             self.title = "VetTrack Anti-Lost"
             sm = ScreenManager()
             sm.add_widget(MainScreen(name='main'))
             sm.add_widget(SettingsScreen(name='settings'))
-            sm.add_widget(FindScreen(name='find_device')) # Додано новий екран
+            sm.add_widget(FindScreen(name='find_device'))
+            sm.add_widget(WifiFindScreen(name='find_wifi')) # Додано Wi-Fi екран
             return sm
 
     if __name__ == "__main__":
