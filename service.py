@@ -44,6 +44,7 @@ last_seen_time = time.time()
 last_seen_rssi = -100
 smoothed_rssi = None # Програмний амортизатор
 
+# --- СТАРИЙ СКАРНЕР (Для дуже старих телефонів) ---
 class BLEScanCallback(PythonJavaClass):
     __javainterfaces__ = ['android/bluetooth/BluetoothAdapter$LeScanCallback']
     __javacontext__ = 'app'
@@ -59,13 +60,10 @@ class BLEScanCallback(PythonJavaClass):
             address = device.getAddress()
             if address == self.target_mac:
                 last_seen_time = time.time()
-                
-                # Математичний фільтр
                 if smoothed_rssi is None:
                     smoothed_rssi = rssi
                 else:
                     smoothed_rssi = (0.2 * rssi) + (0.8 * smoothed_rssi)
-                
                 last_seen_rssi = int(smoothed_rssi)
 
 def load_config():
@@ -94,7 +92,7 @@ def write_state(status_text, rssi_val):
         pass
 
 def main():
-    global last_seen_time, last_seen_rssi
+    global last_seen_time, last_seen_rssi, smoothed_rssi
     write_state("РАДАР ЗАПУЩЕНО, ШУКАЮ...", -100)
     
     config = load_config()
@@ -109,9 +107,85 @@ def main():
         write_state("ПОМИЛКА: BLUETOOTH ВИМКНЕНО", -100)
         return
 
-    scan_callback = BLEScanCallback(target_mac)
-    adapter.startLeScan(scan_callback)
-    
+    # --- ЗАПУСК СУЧАСНОГО АПАРАТНОГО СКАНЕРА (ФОНОВИЙ РЕЖИМ) ---
+    try:
+        Build = autoclass('android.os.Build$VERSION')
+        modern_scanner_started = False
+        
+        if Build.SDK_INT >= 26: # API 26 (Android 8.0) і вище
+            try:
+                from android.broadcast import BroadcastReceiver
+                
+                # Ця функція ловитиме сигнали, навіть якщо екран чорний
+                def on_ble_found(context, intent):
+                    global last_seen_time, last_seen_rssi, smoothed_rssi
+                    action = intent.getAction()
+                    if action == "com.romanveterinary.BLE_SCAN_RESULT":
+                        results = intent.getParcelableArrayListExtra("android.bluetooth.le.extra.LIST_SCAN_RESULT")
+                        if results and results.size() > 0:
+                            for i in range(results.size()):
+                                scan_result = results.get(i)
+                                rssi = scan_result.getRssi()
+                                last_seen_time = time.time()
+                                if smoothed_rssi is None:
+                                    smoothed_rssi = rssi
+                                else:
+                                    smoothed_rssi = (0.2 * rssi) + (0.8 * smoothed_rssi)
+                                last_seen_rssi = int(smoothed_rssi)
+                                
+                br = BroadcastReceiver(on_ble_found, actions=['com.romanveterinary.BLE_SCAN_RESULT'])
+                
+                IntentFilter = autoclass('android.content.IntentFilter')
+                filter_intent = IntentFilter()
+                filter_intent.addAction('com.romanveterinary.BLE_SCAN_RESULT')
+                
+                # Реєструємо слухача напряму в сервісі (захищає від зупинок)
+                if Build.SDK_INT >= 33:
+                    service_context.registerReceiver(br.receiver, filter_intent, 4) # 4 = RECEIVER_NOT_EXPORTED
+                else:
+                    service_context.registerReceiver(br.receiver, filter_intent)
+                    
+                PendingIntent = autoclass('android.app.PendingIntent')
+                ArrayList = autoclass('java.util.ArrayList')
+                ScanFilterBuilder = autoclass('android.bluetooth.le.ScanFilter$Builder')
+                ScanSettingsBuilder = autoclass('android.bluetooth.le.ScanSettings$Builder')
+                ScanSettings = autoclass('android.bluetooth.le.ScanSettings')
+                
+                intent = Intent("com.romanveterinary.BLE_SCAN_RESULT")
+                intent.setPackage(service_context.getPackageName())
+                
+                flag = 134217728 # FLAG_UPDATE_CURRENT
+                if Build.SDK_INT >= 31:
+                    flag |= 33554432 # FLAG_MUTABLE
+                    
+                pending_intent = PendingIntent.getBroadcast(service_context, 0, intent, flag)
+                
+                # ОСЬ ВІН - АПАРАТНИЙ ФІЛЬТР (Дозволяє сканування при вимкненому екрані)
+                fb = ScanFilterBuilder()
+                fb.setDeviceAddress(target_mac)
+                filters = ArrayList()
+                filters.add(fb.build())
+                
+                sb = ScanSettingsBuilder()
+                sb.setScanMode(1) # 1 = SCAN_MODE_BALANCED (Оптимально для фону)
+                settings = sb.build()
+                
+                scanner = adapter.getBluetoothLeScanner()
+                if scanner:
+                    scanner.startScan(filters, settings, pending_intent)
+                    modern_scanner_started = True
+                    
+            except Exception as e:
+                modern_scanner_started = False
+                
+        if not modern_scanner_started:
+            scan_callback = BLEScanCallback(target_mac)
+            adapter.startLeScan(scan_callback)
+            
+    except Exception as e:
+        write_state(f"SCAN ERROR: {e}", -100)
+
+    # --- НАЛАШТУВАННЯ МЕЛОДІЇ ---
     player = MediaPlayer()
     alarm_playing = False
     disconnect_start_time = None
@@ -125,9 +199,10 @@ def main():
             player.setDataSource(os.path.join(app_dir, "sonar.wav"))
         player.prepare()
         player.setLooping(True)
-    except Exception as e:
+    except Exception:
         pass
 
+    # --- ГОЛОВНИЙ ЦИКЛ ПЕРЕВІРКИ ---
     while True:
         current_time = time.time()
         config = load_config() 
@@ -137,10 +212,7 @@ def main():
         max_alarm_duration = config["alarm_duration"] * 60
         ping_interval = config["ping_interval"]
         
-        # --- ВИПРАВЛЕННЯ ТУТ ---
-        # Динамічна толерантність до тиші ефіру. 
-        # Даємо системі мінімум 15 секунд або 3х інтервал опитування,
-        # щоб скомпенсувати затримки фонового режиму Android.
+        # Динамічна толерантність
         silence_tolerance = max(15.0, ping_interval * 3.0)
         device_missing = (current_time - last_seen_time) > silence_tolerance
         
