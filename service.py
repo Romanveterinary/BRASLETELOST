@@ -4,12 +4,11 @@ import json
 import traceback
 from jnius import autoclass, PythonJavaClass, java_method
 
-# --- ВАЖЛИВЕ ДОПОВНЕННЯ ДЛЯ FOREGROUND ---
 PythonService = autoclass('org.kivy.android.PythonService')
 service_context = PythonService.mService
 context = service_context.getApplicationContext()
 
-# Створюємо повідомлення в шторці (ОБОВ'ЯЗКОВО для роботи в фоні на Android)
+# --- 1. ПОВІДОМЛЕННЯ В ШТОРЦІ (FOREGROUND) ---
 NotificationBuilder = autoclass('android.app.Notification$Builder')
 NotificationChannel = autoclass('android.app.NotificationChannel')
 channel_id = "vettrack_channel"
@@ -22,7 +21,18 @@ builder.setContentTitle("VetTrack Anti-Lost")
 builder.setContentText("Моніторинг BLE пристрою...")
 builder.setSmallIcon(0x01080038)
 service_context.startForeground(1, builder.build())
-# ------------------------------------------
+
+# --- 2. WAKE LOCK (БЛОКУВАННЯ СНУ) ---
+# Цей блок змушує Bluetooth працювати, навіть коли екран вимкнено
+try:
+    PowerManager = autoclass('android.os.PowerManager')
+    power_manager = context.getSystemService("power")
+    # Параметр 1 означає PARTIAL_WAKE_LOCK (дозволяє процесору працювати при вимкненому екрані)
+    wake_lock = power_manager.newWakeLock(1, "VetTrack::BleScanLock")
+    wake_lock.acquire()
+except Exception as e:
+    pass
+# ------------------------------------
 
 BluetoothAdapter = autoclass('android.bluetooth.BluetoothAdapter')
 Intent = autoclass('android.content.Intent')
@@ -30,7 +40,7 @@ MediaPlayer = autoclass('android.media.MediaPlayer')
 
 files_dir = service_context.getFilesDir().getAbsolutePath()
 CONFIG_FILE = os.path.join(files_dir, "anti_lost_config.json")
-STATE_FILE = os.path.join(files_dir, "live_state.json") # Наша "поштова скринька"
+STATE_FILE = os.path.join(files_dir, "live_state.json")
 
 last_seen_time = time.time()
 last_seen_rssi = -100
@@ -70,7 +80,6 @@ def load_config():
             pass
     return default_config
 
-# Функція запису поточного стану для графічного інтерфейсу
 def write_state(status_text, rssi_val):
     try:
         with open(STATE_FILE, "w") as f:
@@ -80,8 +89,6 @@ def write_state(status_text, rssi_val):
 
 def main():
     global last_seen_time, last_seen_rssi
-    
-    # Очищуємо старий стан при запуску
     write_state("РАДАР ЗАПУЩЕНО, ШУКАЮ...", -100)
     
     config = load_config()
@@ -169,9 +176,7 @@ def main():
                     pass
             disconnect_start_time = None
 
-        # Записуємо свіжий стан у нашу скриньку
         write_state(current_status, last_seen_rssi)
-
         time.sleep(config["ping_interval"])
 
 if __name__ == '__main__':
