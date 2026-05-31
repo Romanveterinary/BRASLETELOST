@@ -48,6 +48,7 @@ try:
     def load_full_config():
         default_config = {
             "mac_address": "",
+            "device_name": "Невідомий пристрій",
             "rssi_threshold": -85,
             "ping_interval": 2,
             "timeout_limit": 5,
@@ -131,15 +132,22 @@ try:
             box_dur.add_widget(self.duration_info)
             layout.add_widget(box_dur)
 
-            self.btn_start = Button(text="ЗАПУСТИТИ СЛУЖБУ", font_size='16sp', bold=True, background_color=(0.2, 0.8, 0.2, 1), size_hint_y=0.1)
+            # Кнопки керування
+            box_btns = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=0.1)
+            self.btn_start = Button(text="ЗАПУСТИТИ ФОН", font_size='14sp', bold=True, background_color=(0.2, 0.8, 0.2, 1))
             self.btn_start.bind(on_press=self.start_service)
-            layout.add_widget(self.btn_start)
-
-            self.btn_stop = Button(text="ЗУПИНИТИ СЛУЖБУ", font_size='16sp', bold=True, background_color=(0.8, 0.2, 0.2, 1), size_hint_y=0.1)
+            self.btn_stop = Button(text="ЗУПИНИТИ ФОН", font_size='14sp', bold=True, background_color=(0.8, 0.2, 0.2, 1))
             self.btn_stop.bind(on_press=self.stop_service)
-            layout.add_widget(self.btn_stop)
+            box_btns.add_widget(self.btn_start)
+            box_btns.add_widget(self.btn_stop)
+            layout.add_widget(box_btns)
 
-            self.btn_settings = Button(text="НАЛАШТУВАННЯ ПРИСТРОЮ", font_size='14sp', background_color=(0.3, 0.3, 0.3, 1), size_hint_y=0.1)
+            # Нова кнопка "Знайти пристрій"
+            self.btn_find = Button(text="ЗНАЙТИ СПАРЕНИЙ ПРИСТРІЙ", font_size='16sp', bold=True, background_color=(0.2, 0.6, 0.8, 1), size_hint_y=0.1)
+            self.btn_find.bind(on_press=self.go_to_find)
+            layout.add_widget(self.btn_find)
+
+            self.btn_settings = Button(text="НАЛАШТУВАННЯ", font_size='14sp', background_color=(0.3, 0.3, 0.3, 1), size_hint_y=0.1)
             self.btn_settings.bind(on_press=self.go_to_settings)
             layout.add_widget(self.btn_settings)
 
@@ -208,11 +216,11 @@ try:
             self.time_slider.disabled = True
             self.duration_slider.disabled = True
             self.btn_settings.disabled = True
+            self.btn_find.disabled = True # Блокуємо пошук під час фонової роботи
 
             if platform == 'android':
                 try:
                     from jnius import autoclass
-                    # ОСЬ ТУТ ВИПРАВЛЕНО: Ми звертаємося до згенерованого класу ServiceScanner
                     service = autoclass("com.romanveterinary.vettrack_antilost.ServiceScanner")
                     mActivity = autoclass("org.kivy.android.PythonActivity").mActivity
                     service.start(mActivity, "")
@@ -235,6 +243,7 @@ try:
             self.time_slider.disabled = False
             self.duration_slider.disabled = False
             self.btn_settings.disabled = False
+            self.btn_find.disabled = False
 
             try:
                 state_file = get_state_path()
@@ -246,7 +255,6 @@ try:
             if platform == 'android':
                 try:
                     from jnius import autoclass
-                    # ОСЬ ТУТ ВИПРАВЛЕНО ТАКОЖ
                     service = autoclass("com.romanveterinary.vettrack_antilost.ServiceScanner")
                     mActivity = autoclass("org.kivy.android.PythonActivity").mActivity
                     service.stop(mActivity)
@@ -255,11 +263,93 @@ try:
 
         def go_to_settings(self, instance):
             self.manager.current = 'settings'
+            
+        def go_to_find(self, instance):
+            config = load_full_config()
+            if not config.get("mac_address"):
+                self.status_label.text = "СПОЧАТКУ ВИБЕРІТЬ ПРИСТРІЙ!"
+                self.status_label.color = (1, 0.2, 0.2, 1)
+                return
+            self.manager.current = 'find_device'
+
+    # НОВИЙ ЕКРАН ПОШУКУ (ГАРЯЧЕ/ХОЛОДНО)
+    class FindScreen(Screen):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.target_mac = ""
+            
+            self.bluetooth_adapter = None
+            self.scan_callback = None
+            if platform == "android":
+                self.bluetooth_adapter = BluetoothAdapter.getDefaultAdapter()
+
+            layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
+
+            self.title_label = Label(text="РАДАР ПОШУКУ", font_size='20sp', bold=True, size_hint_y=0.1)
+            layout.add_widget(self.title_label)
+
+            self.distance_label = Label(text="ОЧІКУВАННЯ СИГНАЛУ...", font_size='30sp', bold=True, color=(0.5, 0.5, 0.5, 1), size_hint_y=0.6)
+            layout.add_widget(self.distance_label)
+
+            self.details_label = Label(text="RSSI: -- dBm", font_size='16sp', color=(0.7, 0.7, 0.7, 1), size_hint_y=0.1)
+            layout.add_widget(self.details_label)
+
+            btn_back = Button(text="ЗУПИНИТИ ПОШУК", font_size='16sp', bold=True, background_color=(0.8, 0.2, 0.2, 1), size_hint_y=0.2)
+            btn_back.bind(on_press=self.stop_search)
+            layout.add_widget(btn_back)
+
+            self.add_widget(layout)
+
+        def on_enter(self):
+            config = load_full_config()
+            self.target_mac = config.get("mac_address", "")
+            device_name = config.get("device_name", "Невідомий пристрій")
+            
+            self.title_label.text = f"ШУКАЮ: {device_name}"
+            self.distance_label.text = "ШУКАЮ СИГНАЛ..."
+            self.distance_label.color = (0.5, 0.5, 0.5, 1)
+            self.details_label.text = f"MAC: {self.target_mac}"
+
+            if self.target_mac and self.bluetooth_adapter:
+                self.scan_callback = BLEScanCallback(self.on_device_found)
+                self.bluetooth_adapter.startLeScan(self.scan_callback)
+
+        @mainthread
+        def on_device_found(self, address, name, rssi):
+            if address == self.target_mac:
+                dist = calc_distance(rssi)
+                self.details_label.text = f"Сигнал: {rssi} dBm (~{dist} м)"
+
+                # Логіка "Гаряче-Холодно" з вібрацією
+                if rssi >= -65:
+                    self.distance_label.text = "ГАРЯЧЕ!\nВІН ТУТ!"
+                    self.distance_label.color = (1, 0.2, 0.2, 1) # Червоний
+                    self.vibrate_phone(0.1)
+                elif rssi >= -80:
+                    self.distance_label.text = "ТЕПЛО\nБЛИЗЬКО"
+                    self.distance_label.color = (1, 0.8, 0.2, 1) # Жовтий
+                else:
+                    self.distance_label.text = "ХОЛОДНО\nДАЛЕКО"
+                    self.distance_label.color = (0.2, 0.6, 1, 1) # Синій
+                    
+        def vibrate_phone(self, duration):
+            try:
+                from plyer import vibrator
+                vibrator.vibrate(time=duration)
+            except:
+                pass
+
+        def stop_search(self, instance):
+            if self.bluetooth_adapter and self.scan_callback:
+                self.bluetooth_adapter.stopLeScan(self.scan_callback)
+                self.scan_callback = None
+            self.manager.current = 'main'
 
     class SettingsScreen(Screen):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
             self.found_devices = {}
+            self.selected_device_name = "Невідомий пристрій" # Додано для збереження назви
             
             self.bluetooth_adapter = None
             self.scan_callback = None
@@ -327,7 +417,8 @@ try:
                 btn_text = f"{dev_name} \n[{address}] | {rssi} dBm (~{dist} м)"
                 
                 dev_btn = ToggleButton(text=btn_text, group='ble_dev', size_hint=(1, None), height=100, font_size='14sp')
-                dev_btn.bind(on_press=lambda inst, addr=address: self.select_device(addr))
+                # Оновлено: тепер ми передаємо і мак, і назву
+                dev_btn.bind(on_press=lambda inst, addr=address, d_name=dev_name: self.select_device(addr, d_name))
                 
                 self.devices_container.add_widget(dev_btn)
                 self.devices_container.height += 105
@@ -362,12 +453,14 @@ try:
                 self.devices_container.add_widget(lbl)
                 self.devices_container.height += 40
 
-        def select_device(self, address):
+        def select_device(self, address, name):
             self.mac_input.text = address
+            self.selected_device_name = name # Зберігаємо назву для радара
 
         def save_config(self, instance):
             save_full_config({
                 "mac_address": self.mac_input.text.strip(),
+                "device_name": getattr(self, "selected_device_name", "Невідомий пристрій"),
                 "melody_path": self.melody_input.text.strip()
             })
             self.manager.current = 'main'
@@ -375,6 +468,7 @@ try:
         def load_config(self):
             config = load_full_config()
             self.mac_input.text = config.get("mac_address", "")
+            self.selected_device_name = config.get("device_name", "Невідомий пристрій")
             self.melody_input.text = config.get("melody_path", "")
 
     class AntiLostApp(App):
@@ -389,13 +483,15 @@ try:
                     Permission.ACCESS_FINE_LOCATION,
                     Permission.ACCESS_COARSE_LOCATION,
                     Permission.READ_EXTERNAL_STORAGE,  
-                    Permission.READ_MEDIA_AUDIO        
+                    Permission.READ_MEDIA_AUDIO,
+                    Permission.VIBRATE # Додано дозвіл на вібрацію
                 ])
 
             self.title = "VetTrack Anti-Lost"
             sm = ScreenManager()
             sm.add_widget(MainScreen(name='main'))
             sm.add_widget(SettingsScreen(name='settings'))
+            sm.add_widget(FindScreen(name='find_device')) # Додано новий екран
             return sm
 
     if __name__ == "__main__":
