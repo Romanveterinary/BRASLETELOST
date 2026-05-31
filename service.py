@@ -8,7 +8,7 @@ PythonService = autoclass('org.kivy.android.PythonService')
 service_context = PythonService.mService
 context = service_context.getApplicationContext()
 
-# --- 1. ПОВІДОМЛЕННЯ В ШТОРЦІ (FOREGROUND) ---
+# --- ПОВІДОМЛЕННЯ В ШТОРЦІ (FOREGROUND) ---
 NotificationBuilder = autoclass('android.app.Notification$Builder')
 NotificationChannel = autoclass('android.app.NotificationChannel')
 channel_id = "vettrack_channel"
@@ -22,17 +22,14 @@ builder.setContentText("Моніторинг BLE пристрою...")
 builder.setSmallIcon(0x01080038)
 service_context.startForeground(1, builder.build())
 
-# --- 2. WAKE LOCK (БЛОКУВАННЯ СНУ) ---
-# Цей блок змушує Bluetooth працювати, навіть коли екран вимкнено
+# --- WAKE LOCK (БЛОКУВАННЯ СНУ) ---
 try:
     PowerManager = autoclass('android.os.PowerManager')
     power_manager = context.getSystemService("power")
-    # Параметр 1 означає PARTIAL_WAKE_LOCK (дозволяє процесору працювати при вимкненому екрані)
     wake_lock = power_manager.newWakeLock(1, "VetTrack::BleScanLock")
     wake_lock.acquire()
 except Exception as e:
     pass
-# ------------------------------------
 
 BluetoothAdapter = autoclass('android.bluetooth.BluetoothAdapter')
 Intent = autoclass('android.content.Intent')
@@ -42,8 +39,10 @@ files_dir = service_context.getFilesDir().getAbsolutePath()
 CONFIG_FILE = os.path.join(files_dir, "anti_lost_config.json")
 STATE_FILE = os.path.join(files_dir, "live_state.json")
 
+# Глобальні змінні
 last_seen_time = time.time()
 last_seen_rssi = -100
+smoothed_rssi = None # Наш програмний амортизатор
 
 class BLEScanCallback(PythonJavaClass):
     __javainterfaces__ = ['android/bluetooth/BluetoothAdapter$LeScanCallback']
@@ -55,12 +54,19 @@ class BLEScanCallback(PythonJavaClass):
 
     @java_method('(Landroid/bluetooth/BluetoothDevice;I[B)V')
     def onLeScan(self, device, rssi, scanRecord):
-        global last_seen_time, last_seen_rssi
+        global last_seen_time, last_seen_rssi, smoothed_rssi
         if device:
             address = device.getAddress()
             if address == self.target_mac:
                 last_seen_time = time.time()
-                last_seen_rssi = rssi
+                
+                # Математичний фільтр (амортизатор)
+                if smoothed_rssi is None:
+                    smoothed_rssi = rssi
+                else:
+                    smoothed_rssi = (0.2 * rssi) + (0.8 * smoothed_rssi)
+                
+                last_seen_rssi = int(smoothed_rssi)
 
 def load_config():
     default_config = {
@@ -130,7 +136,8 @@ def main():
         timeout_limit = config["timeout_limit"]
         max_alarm_duration = config["alarm_duration"] * 60
         
-        device_missing = (current_time - last_seen_time) > 2.0
+        # Толерантність до тиші (5 секунд замість 2)
+        device_missing = (current_time - last_seen_time) > 5.0
         
         current_status = "НЕВІДОМО"
         
