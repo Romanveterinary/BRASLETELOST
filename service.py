@@ -31,6 +31,25 @@ try:
 except Exception as e:
     pass
 
+# --- НАЛАШТУВАННЯ ВІБРАЦІЇ ---
+try:
+    vibrator = context.getSystemService("vibrator")
+except:
+    vibrator = None
+
+def trigger_vibration():
+    if vibrator:
+        try:
+            Build = autoclass('android.os.Build$VERSION')
+            if Build.SDK_INT >= 26:
+                VibrationEffect = autoclass('android.os.VibrationEffect')
+                effect = VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE)
+                vibrator.vibrate(effect)
+            else:
+                vibrator.vibrate(500)
+        except Exception:
+            pass
+
 BluetoothAdapter = autoclass('android.bluetooth.BluetoothAdapter')
 Intent = autoclass('android.content.Intent')
 MediaPlayer = autoclass('android.media.MediaPlayer')
@@ -44,7 +63,6 @@ last_seen_time = time.time()
 last_seen_rssi = -100
 smoothed_rssi = None # Програмний амортизатор
 
-# --- СТАРИЙ СКАРНЕР (Для дуже старих телефонів) ---
 class BLEScanCallback(PythonJavaClass):
     __javainterfaces__ = ['android/bluetooth/BluetoothAdapter$LeScanCallback']
     __javacontext__ = 'app'
@@ -60,10 +78,13 @@ class BLEScanCallback(PythonJavaClass):
             address = device.getAddress()
             if address == self.target_mac:
                 last_seen_time = time.time()
+                
+                # Математичний фільтр
                 if smoothed_rssi is None:
                     smoothed_rssi = rssi
                 else:
                     smoothed_rssi = (0.2 * rssi) + (0.8 * smoothed_rssi)
+                
                 last_seen_rssi = int(smoothed_rssi)
 
 def load_config():
@@ -107,16 +128,15 @@ def main():
         write_state("ПОМИЛКА: BLUETOOTH ВИМКНЕНО", -100)
         return
 
-    # --- ЗАПУСК СУЧАСНОГО АПАРАТНОГО СКАНЕРА (ФОНОВИЙ РЕЖИМ) ---
+    # --- ЗАПУСК СУЧАСНОГО АПАРАТНОГО СКАНЕРА ---
     try:
         Build = autoclass('android.os.Build$VERSION')
         modern_scanner_started = False
         
-        if Build.SDK_INT >= 26: # API 26 (Android 8.0) і вище
+        if Build.SDK_INT >= 26:
             try:
                 from android.broadcast import BroadcastReceiver
                 
-                # Ця функція ловитиме сигнали, навіть якщо екран чорний
                 def on_ble_found(context, intent):
                     global last_seen_time, last_seen_rssi, smoothed_rssi
                     action = intent.getAction()
@@ -139,9 +159,8 @@ def main():
                 filter_intent = IntentFilter()
                 filter_intent.addAction('com.romanveterinary.BLE_SCAN_RESULT')
                 
-                # Реєструємо слухача напряму в сервісі (захищає від зупинок)
                 if Build.SDK_INT >= 33:
-                    service_context.registerReceiver(br.receiver, filter_intent, 4) # 4 = RECEIVER_NOT_EXPORTED
+                    service_context.registerReceiver(br.receiver, filter_intent, 4) 
                 else:
                     service_context.registerReceiver(br.receiver, filter_intent)
                     
@@ -149,7 +168,6 @@ def main():
                 ArrayList = autoclass('java.util.ArrayList')
                 ScanFilterBuilder = autoclass('android.bluetooth.le.ScanFilter$Builder')
                 ScanSettingsBuilder = autoclass('android.bluetooth.le.ScanSettings$Builder')
-                ScanSettings = autoclass('android.bluetooth.le.ScanSettings')
                 
                 intent = Intent("com.romanveterinary.BLE_SCAN_RESULT")
                 intent.setPackage(service_context.getPackageName())
@@ -160,14 +178,13 @@ def main():
                     
                 pending_intent = PendingIntent.getBroadcast(service_context, 0, intent, flag)
                 
-                # ОСЬ ВІН - АПАРАТНИЙ ФІЛЬТР (Дозволяє сканування при вимкненому екрані)
                 fb = ScanFilterBuilder()
                 fb.setDeviceAddress(target_mac)
                 filters = ArrayList()
                 filters.add(fb.build())
                 
                 sb = ScanSettingsBuilder()
-                sb.setScanMode(1) # 1 = SCAN_MODE_BALANCED (Оптимально для фону)
+                sb.setScanMode(1) # SCAN_MODE_BALANCED
                 settings = sb.build()
                 
                 scanner = adapter.getBluetoothLeScanner()
@@ -202,7 +219,7 @@ def main():
     except Exception:
         pass
 
-    # --- ГОЛОВНИЙ ЦИКЛ ПЕРЕВІРКИ ---
+    # --- ГОЛОВНИЙ ЦИКЛ ПЕРЕВІРКИ З РЕЖИМОМ ПАНІКИ ---
     while True:
         current_time = time.time()
         config = load_config() 
@@ -212,13 +229,17 @@ def main():
         max_alarm_duration = config["alarm_duration"] * 60
         ping_interval = config["ping_interval"]
         
-        # Динамічна толерантність
-        silence_tolerance = max(15.0, ping_interval * 3.0)
-        device_missing = (current_time - last_seen_time) > silence_tolerance
+        time_since_last_seen = current_time - last_seen_time
+        
+        # Визначаємо, чи є ПІДОЗРА на втрату (немає сигналу довше за Інтервал + 2 секунди)
+        is_suspicious = (time_since_last_seen > (ping_interval + 2.0)) or (last_seen_rssi < target_rssi)
         
         current_status = "НЕВІДОМО"
+        current_sleep = ping_interval # За замовчуванням спимо економно
         
-        if device_missing or last_seen_rssi < target_rssi:
+        if is_suspicious:
+            current_sleep = 1.0 # РЕЖИМ ПАНІКИ! Прокидаємося щосекунди
+            
             if disconnect_start_time is None:
                 disconnect_start_time = current_time
                 
@@ -226,6 +247,7 @@ def main():
             
             if elapsed >= timeout_limit:
                 current_status = "🚨 ТРИВОГА! ЗВ'ЯЗОК ВТРАЧЕНО 🚨"
+                
                 if not alarm_playing:
                     try:
                         intent = Intent()
@@ -233,24 +255,31 @@ def main():
                         service_context.sendBroadcast(intent)
                     except Exception:
                         pass
-                        
                     try:
                         player.start()
                         alarm_playing = True
                     except:
                         pass
-                        
-                if alarm_playing and elapsed >= (timeout_limit + max_alarm_duration):
-                    try:
-                        player.pause()
-                        alarm_playing = False
-                    except:
-                        pass
+                
+                # Пульсуюча вібрація кожну секунду під час тривоги
+                if alarm_playing:
+                    trigger_vibration()
+                    
+                    # Вимикаємо сирену, якщо минув максимальний час роботи
+                    if elapsed >= (timeout_limit + max_alarm_duration):
+                        try:
+                            player.pause()
+                            alarm_playing = False
+                        except:
+                            pass
             else:
                 time_left = int(timeout_limit - elapsed)
-                current_status = f"ВТРАЧАЮ ЗВ'ЯЗОК! Сирена через {time_left} сек"
+                current_status = f"ПІДОЗРА ВТРАТИ! Сирена через {time_left} сек"
         else:
+            # Все добре, скасовуємо паніку і повертаємося до норми
             current_status = "🟢 ЗВ'ЯЗОК СТАБІЛЬНИЙ"
+            current_sleep = ping_interval
+            
             if alarm_playing:
                 try:
                     player.pause()
@@ -261,7 +290,9 @@ def main():
             disconnect_start_time = None
 
         write_state(current_status, last_seen_rssi)
-        time.sleep(ping_interval)
+        
+        # Спимо або стандартний час (економія), або 1 секунду (паніка)
+        time.sleep(current_sleep)
 
 if __name__ == '__main__':
     try:
