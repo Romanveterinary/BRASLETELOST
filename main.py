@@ -683,10 +683,14 @@ Não use o radar constantemente (consome 2-8% por hora).
             layout.add_widget(self.mel_lbl)
             box_melody = BoxLayout(orientation='horizontal', size_hint_y=0.1, spacing=5)
             self.melody_input = TextInput(text="", multiline=False, font_size='12sp', size_hint_x=0.7)
+            
+            # ВИПРАВЛЕНО: додано "self." перед btn_choose_melody
             self.btn_choose_melody = Button(font_size='14sp', background_color=(0.4, 0.4, 0.4, 1), size_hint_x=0.3)
             self.btn_choose_melody.bind(on_press=self.choose_melody)
+            
             box_melody.add_widget(self.melody_input)
-            box_melody.add_widget(btn_choose_melody)
+            box_melody.add_widget(self.btn_choose_melody) # ТЕПЕР ТУТ self.
+            
             layout.add_widget(box_melody)
 
             box_bottom = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=0.15)
