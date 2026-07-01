@@ -51,7 +51,7 @@ try:
             "dur_title": "ТРИВАЛІСТЬ СИРЕНИ",
             "start_bg": "ЗАПУСТИТИ ФОН",
             "stop_bg": "ЗУПИНИТИ ФОН",
-            "find_bt": "ПОШУК ПРИСТРОЮ",
+            "find_bt": "ПОШУК ПРИСТРОЮ (ОБЕРІТЬ МЕТУ)",
             "find_wifi": "ПОШУК WI-FI",
             "settings": "НАЛАШТУВАННЯ",
             "inst_btn": "📖 ІНСТРУКЦІЯ КОРИСТУВАЧА",
@@ -63,7 +63,7 @@ try:
             "cold": "ХОЛОДНО\nДАЛЕКО",
             "wifi_hot": "ГАРЯЧЕ!\nРОУТЕР ТУТ!",
             "wifi_warm": "ТЕПЛО\nУ ЦІЙ КІМНАТІ",
-            "wait_sig": "ОЧІКУВАННЯ СИГНАЛУ...",
+            "wait_sig": "ШУКАЮ ПРИСТРОЇ НАВКОЛО...",
             "target": "МЕТА",
             "signal": "Сигнал",
             "inst_title": "ІНСТРУКЦІЯ",
@@ -81,8 +81,8 @@ try:
             "m": "м",
             "inst_text": """Цей додаток перетворює ваш телефон або планшет на охоронний радар для будь-якого Bluetooth-пристрою (фітнес-браслет, навушники, годинник тощо). Програма працює у фоновому режимі.
 
-• Крок 1: Вибір пристрою та мелодії
-Перейдіть у Налаштування -> натисніть Запустити радар ефіру. Знайдіть свій пристрій у списку та натисніть на нього. За бажанням виберіть власну мелодію. Натисніть Зберегти конфіг.
+• Крок 1: Вибір пристрою через Пошук
+Натисніть кнопку "ПОШУК ПРИСТРОЮ" на головному екрані. Програма почне бачити всі девайси навколо у реальному часі. Знайдіть свій браслет, подивіться на його сигнал (Гаряче/Тепло/Холодно) і просто натисніть на нього. Програма сама збереже його і поверне вас на головну сторінку.
 
 • Сила сигналу (Поріг RSSI)
 Верхній повзунок регулює орієнтовну відстань між девайсом та телефоном. Що ближче до -60 dBm, то на меншій відстані спрацює тривога.
@@ -110,7 +110,7 @@ try:
             "dur_title": "SIREN DURATION",
             "start_bg": "START BACKGROUND",
             "stop_bg": "STOP BACKGROUND",
-            "find_bt": "FIND DEVICE",
+            "find_bt": "FIND DEVICE (CHOOSE TARGET)",
             "find_wifi": "FIND WI-FI",
             "settings": "SETTINGS",
             "inst_btn": "📖 USER MANUAL",
@@ -122,7 +122,7 @@ try:
             "cold": "COLD\nFAR AWAY",
             "wifi_hot": "HOT!\nROUTER IS HERE!",
             "wifi_warm": "WARM\nIN THIS ROOM",
-            "wait_sig": "WAITING FOR SIGNAL...",
+            "wait_sig": "SCANNING FOR DEVICES...",
             "target": "TARGET",
             "signal": "Signal",
             "inst_title": "INSTRUCTIONS",
@@ -140,8 +140,8 @@ try:
             "m": "m",
             "inst_text": """This app turns your phone or tablet into a security radar for any Bluetooth device (fitness band, headphones, smartwatch, etc.). The app runs in the background.
 
-• Step 1: Select Device & Melody
-Go to Settings -> tap Start Ether Radar. Find your device in the list and tap it. Optionally, choose a custom melody. Tap Save Config.
+• Step 1: Select Device via Find Screen
+Tap "FIND DEVICE" on the main screen. The app will scan and display all nearby devices in real-time. Find your tracker, check its signal level (Hot/Warm/Cold), and simply tap on it. The app will save it and automatically return you to the main screen.
 
 • Signal Strength (RSSI Threshold)
 Adjusts the approximate distance. Closer to -60 dBm means the alarm will trigger at a shorter distance.
@@ -169,7 +169,7 @@ Do not use the radar constantly (consumes 2-8% per hour). To reduce drain, set a
             "dur_title": "DURAÇÃO DA SIRENE",
             "start_bg": "INICIAR FUNDO",
             "stop_bg": "PARAR FUNDO",
-            "find_bt": "ENCONTRAR DISPOSITIVO",
+            "find_bt": "BUSCAR DISPOSITIVO (ALVO)",
             "find_wifi": "ENCONTRAR WI-FI",
             "settings": "CONFIGURAÇÕES",
             "inst_btn": "📖 MANUAL DO USUÁRIO",
@@ -181,7 +181,7 @@ Do not use the radar constantly (consumes 2-8% per hour). To reduce drain, set a
             "cold": "FRIO\nLONGE",
             "wifi_hot": "QUENTE!\nROTEADOR AQUI!",
             "wifi_warm": "MORNO\nNESTA SALA",
-            "wait_sig": "AGUARDANDO SINAL...",
+            "wait_sig": "BUSCANDO DISPOSITIVOS...",
             "target": "ALVO",
             "signal": "Sinal",
             "inst_title": "INSTRUÇÕES",
@@ -199,8 +199,8 @@ Do not use the radar constantly (consumes 2-8% per hour). To reduce drain, set a
             "m": "m",
             "inst_text": """Este aplicativo transforma seu celular ou tablet em um radar de segurança para qualquer dispositivo Bluetooth (pulseira fitness, fones de ouvido, smartwatch, etc.). Funciona em segundo plano.
 
-• Passo 1: Selecione o Dispositivo e Melodia
-Vá para Configurações -> toque em Iniciar Radar. Encontre o seu dispositivo na lista e toque nele. Opcionalmente, escolha uma melodia personalizada. Toque em Salvar Config.
+• Passo 1: Selecione o Dispositivo via Busca
+Toque em "BUSCAR DISPOSITIVO" na tela principal. O aplicativo irá escanear e exibir todos os dispositivos próximos em tempo real. Encontre seu rastreador, verifique o sinal (Quente/Morno/Frio) e simplesmente toque nele. O aplicativo irá salvar e voltar automaticamente para a tela principal.
 
 • Força do Sinal (Limite RSSI)
 Ajusta a distância aproximada. Mais perto de -60 dBm significa que o alarme disparará a uma distância menor.
@@ -235,7 +235,7 @@ Não use o radar constantemente (consome 2-8% por hora).
             "timeout_limit": 5,
             "alarm_duration": 2,
             "melody_path": "",
-            "language": "uk" # Додано мову за замовчуванням
+            "language": "uk"
         }
         config_file = get_config_path()
         if os.path.exists(config_file):
@@ -351,10 +351,22 @@ Não use o radar constantemente (consome 2-8% por hora).
             self.service_running = False
 
         def on_enter(self):
-            # Оновлюємо тексти при кожному вході на екран (залежить від мови)
             self.title_label.text = get_t("app_title")
-            self.status_label.text = get_t("ready")
-            self.target_label.text = get_t("no_dev")
+            
+            config = load_full_config()
+            if config.get("mac_address"):
+                mac = config.get("mac_address")
+                name = config.get("device_name", "Device")
+                self.target_label.text = f"{get_t('target')}: {name}\n[{mac}]"
+                self.target_label.color = (0.2, 0.8, 0.2, 1)
+            else:
+                self.target_label.text = get_t("no_dev")
+                self.target_label.color = (0.5, 0.5, 0.5, 0.5)
+
+            if not self.service_running:
+                self.status_label.text = get_t("ready")
+                self.status_label.color = (0.5, 0.5, 0.5, 1)
+
             self.rssi_title.text = get_t("rssi_title")
             self.ping_title.text = get_t("ping_title")
             self.delay_title.text = get_t("delay_title")
@@ -365,7 +377,6 @@ Não use o radar constantemente (consome 2-8% por hora).
             self.btn_find_wifi.text = get_t("find_wifi")
             self.btn_settings.text = get_t("settings")
             
-            # Оновлюємо інфо під повзунками
             self.on_rssi_change(None, self.rssi_slider.value)
             self.on_ping_change(None, self.ping_slider.value)
             self.on_time_change(None, self.time_slider.value)
@@ -393,12 +404,13 @@ Não use o radar constantemente (consome 2-8% por hora).
                         alpha = max(0.1, min(1.0, (rssi_val + 100) / 50.0))
                         config = load_full_config()
                         mac = config.get("mac_address", "...")
+                        name = config.get("device_name", "Device")
                         dist = calc_distance(rssi_val)
                         
                         t_lbl = get_t("target")
                         s_lbl = get_t("signal")
                         m_lbl = get_t("m")
-                        self.target_label.text = f"{t_lbl}: {mac}\n{s_lbl} {rssi_val} dBm (~{dist} {m_lbl})"
+                        self.target_label.text = f"{t_lbl}: {name}\n[{mac}]\n{s_lbl} {rssi_val} dBm (~{dist} {m_lbl})"
                         self.target_label.color = (0.2, 0.8, 0.2, alpha)
                 except Exception:
                     pass
@@ -449,8 +461,6 @@ Não use o radar constantemente (consome 2-8% por hora).
             self.status_label.text = "ЗУПИНЕНО / STOPPED"
             self.status_label.color = (0.5, 0.5, 0.5, 1)
             self.service_running = False
-            self.target_label.text = ""
-            self.target_label.color = (0.5, 0.5, 0.5, 0.3)
             
             self.rssi_slider.disabled = False
             self.ping_slider.disabled = False
@@ -459,6 +469,8 @@ Não use o radar constantemente (consome 2-8% por hora).
             self.btn_settings.disabled = False
             self.btn_find.disabled = False
             self.btn_find_wifi.disabled = False
+            
+            self.on_enter()
 
             try:
                 state_file = get_state_path()
@@ -480,90 +492,104 @@ Não use o radar constantemente (consome 2-8% por hora).
             self.manager.current = 'settings'
             
         def go_to_find(self, instance):
-            config = load_full_config()
-            if not config.get("mac_address"):
-                self.status_label.text = get_t("no_dev")
-                self.status_label.color = (1, 0.2, 0.2, 1)
-                return
             self.manager.current = 'find_device'
 
         def go_to_wifi_find(self, instance):
             self.manager.current = 'find_wifi'
 
+
+    # --- НОВИЙ МОДЕРНІЗОВАНИЙ ЕКРАН ЖИВОГО ПОШУКУ ТА ВИБОРУ ---
     class FindScreen(Screen):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
-            self.target_mac = ""
-            self.smoothed_rssi = None 
+            self.found_devices = {}  # Словник: {mac: {button_widget, smoothed_rssi, name}}
             self.bluetooth_adapter = None
             self.scan_callback = None
             if platform == "android":
                 self.bluetooth_adapter = BluetoothAdapter.getDefaultAdapter()
 
-            layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
-            self.title_label = Label(font_size='20sp', bold=True, size_hint_y=0.1)
+            layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
+            
+            self.title_label = Label(font_size='18sp', bold=True, size_hint_y=0.1)
             layout.add_widget(self.title_label)
-            self.distance_label = Label(font_size='30sp', bold=True, color=(0.5, 0.5, 0.5, 1), size_hint_y=0.6)
-            layout.add_widget(self.distance_label)
-            self.details_label = Label(font_size='16sp', color=(0.7, 0.7, 0.7, 1), size_hint_y=0.1)
-            layout.add_widget(self.details_label)
-            self.btn_back = Button(font_size='16sp', bold=True, background_color=(0.8, 0.2, 0.2, 1), size_hint_y=0.2)
+
+            # Контейнер для списку пристроїв з прокруткою
+            self.scroll_view = ScrollView(size_hint=(1, 0.75))
+            self.devices_container = BoxLayout(orientation='vertical', spacing=8, size_hint_y=None)
+            self.devices_container.bind(minimum_height=self.devices_container.setter('height'))
+            self.scroll_view.add_widget(self.devices_container)
+            layout.add_widget(self.scroll_view)
+
+            self.btn_back = Button(font_size='16sp', bold=True, background_color=(0.8, 0.2, 0.2, 1), size_hint_y=0.15)
             self.btn_back.bind(on_press=self.stop_search)
             layout.add_widget(self.btn_back)
+
             self.add_widget(layout)
 
         def on_enter(self):
-            config = load_full_config()
-            self.target_mac = config.get("mac_address", "")
-            device_name = config.get("device_name", "Device")
-            self.smoothed_rssi = None 
-            
-            self.title_label.text = f"{get_t('find_bt')}: {device_name}"
-            self.distance_label.text = get_t("wait_sig")
-            self.distance_label.color = (0.5, 0.5, 0.5, 1)
-            self.details_label.text = f"MAC: {self.target_mac}"
+            self.title_label.text = get_t("find_bt")
             self.btn_back.text = get_t("stop_search")
+            self.devices_container.clear_widgets()
+            self.devices_container.height = 0
+            self.found_devices.clear()
 
-            if self.target_mac and self.bluetooth_adapter:
+            # Запуск безперервного живого сканування всього ефіру
+            if self.bluetooth_adapter:
                 self.scan_callback = BLEScanCallback(self.on_device_found)
                 self.bluetooth_adapter.startLeScan(self.scan_callback)
 
         @mainthread
         def on_device_found(self, address, name, rssi):
-            if address == self.target_mac:
-                if self.smoothed_rssi is None:
-                    self.smoothed_rssi = rssi
-                else:
-                    self.smoothed_rssi = (0.2 * rssi) + (0.8 * self.smoothed_rssi)
+            dev_name = name if name else "Device / Невідомий"
+            
+            if address not in self.found_devices:
+                # Якщо пристрій з'явився вперше, створюємо для нього інтерактивну кнопку
+                btn = Button(text="", size_hint=(1, None), height=110, font_size='14sp', halign='center', valign='middle')
+                btn.bind(on_press=lambda inst, addr=address, n=dev_name: self.select_device(addr, n))
+                self.devices_container.add_widget(btn)
+                self.devices_container.height += 118
                 
-                smooth_val = int(self.smoothed_rssi)
-                dist = calc_distance(smooth_val)
-                self.details_label.text = f"{get_t('signal')} {smooth_val} dBm (~{dist} {get_t('m')})"
+                self.found_devices[address] = {
+                    "button": btn,
+                    "smoothed_rssi": rssi,
+                    "name": dev_name
+                }
+            else:
+                # Застосовуємо математичний амортизатор індивідуально для кожного пристрою
+                old_rssi = self.found_devices[address]["smoothed_rssi"]
+                self.found_devices[address]["smoothed_rssi"] = (0.2 * rssi) + (0.8 * old_rssi)
 
-                if smooth_val >= -65:
-                    self.distance_label.text = get_t("hot")
-                    self.distance_label.color = (1, 0.2, 0.2, 1)
-                    self.vibrate_phone(0.1)
-                elif smooth_val >= -80:
-                    self.distance_label.text = get_t("warm")
-                    self.distance_label.color = (1, 0.8, 0.2, 1)
-                else:
-                    self.distance_label.text = get_t("cold")
-                    self.distance_label.color = (0.2, 0.6, 1, 1)
-                    
-        def vibrate_phone(self, duration):
-            try:
-                from plyer import vibrator
-                vibrator.vibrate(time=duration)
-            except:
-                pass
+            smooth_val = int(self.found_devices[address]["smoothed_rssi"])
+            dist = calc_distance(smooth_val)
+            btn = self.found_devices[address]["button"]
+            
+            # Розрахунок статусу та зміна кольору кнопки (Гаряче/Тепло/Холодно)
+            if smooth_val >= -65:
+                status_text = get_t("hot").replace('\n', ' ')
+                btn.background_color = (1, 0.2, 0.2, 1) # Червоний
+            elif smooth_val >= -80:
+                status_text = get_t("warm").replace('\n', ' ')
+                btn.background_color = (1, 0.8, 0.2, 1) # Жовтий
+            else:
+                status_text = get_t("cold").replace('\n', ' ')
+                btn.background_color = (0.2, 0.6, 1, 1) # Синій
+
+            btn.text = f"{dev_name}\n[{address}] | {smooth_val} dBm (~{dist} {get_t('m')})\n{status_text}"
+
+        def select_device(self, address, name):
+            # Клік на пристрій зберігає його як ціль і повертає на головний екран
+            save_full_config({
+                "mac_address": address,
+                "device_name": name
+            })
+            self.stop_search(None)
 
         def stop_search(self, instance):
             if self.bluetooth_adapter and self.scan_callback:
                 self.bluetooth_adapter.stopLeScan(self.scan_callback)
                 self.scan_callback = None
-            self.smoothed_rssi = None
             self.manager.current = 'main'
+
 
     class WifiFindScreen(Screen):
         def __init__(self, **kwargs):
@@ -575,9 +601,9 @@ Não use o radar constantemente (consome 2-8% por hora).
             layout.add_widget(self.distance_label)
             self.details_label = Label(font_size='16sp', color=(0.7, 0.7, 0.7, 1), size_hint_y=0.1)
             layout.add_widget(self.details_label)
-            self.btn_back = Button(font_size='16sp', bold=True, background_color=(0.8, 0.2, 0.2, 1), size_hint_y=0.2)
-            self.btn_back.bind(on_press=self.stop_search)
-            layout.add_widget(self.btn_back)
+            btn_back = Button(font_size='16sp', bold=True, background_color=(0.8, 0.2, 0.2, 1), size_hint_y=0.2)
+            btn_back.bind(on_press=self.stop_search)
+            layout.add_widget(btn_back)
             self.add_widget(layout)
 
         def on_enter(self):
@@ -612,7 +638,6 @@ Não use o radar constantemente (consome 2-8% por hora).
                 if rssi >= -50:
                     self.distance_label.text = get_t("wifi_hot")
                     self.distance_label.color = (1, 0.2, 0.2, 1)
-                    self.vibrate_phone(0.1)
                 elif rssi >= -65:
                     self.distance_label.text = get_t("wifi_warm")
                     self.distance_label.color = (1, 0.8, 0.2, 1)
@@ -620,13 +645,6 @@ Não use o radar constantemente (consome 2-8% por hora).
                     self.distance_label.text = get_t("cold")
                     self.distance_label.color = (0.2, 0.6, 1, 1)
             except Exception:
-                pass
-
-        def vibrate_phone(self, duration):
-            try:
-                from plyer import vibrator
-                vibrator.vibrate(time=duration)
-            except:
                 pass
 
         def stop_search(self, instance):
@@ -637,16 +655,8 @@ Não use o radar constantemente (consome 2-8% por hora).
     class SettingsScreen(Screen):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
-            self.found_devices = {}
-            self.selected_device_name = "Device" 
-            self.bluetooth_adapter = None
-            self.scan_callback = None
-            if platform == "android":
-                self.bluetooth_adapter = BluetoothAdapter.getDefaultAdapter()
-            
             layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
             
-            # --- БЛОК ВИБОРУ МОВИ ---
             box_lang = BoxLayout(orientation='horizontal', size_hint_y=0.1, spacing=10)
             btn_uk = Button(text="🇺🇦 UKR", font_size='16sp', background_color=(0.3, 0.5, 0.8, 1))
             btn_en = Button(text="🇬🇧 ENG", font_size='16sp', background_color=(0.8, 0.3, 0.3, 1))
@@ -660,7 +670,6 @@ Não use o radar constantemente (consome 2-8% por hora).
             box_lang.add_widget(btn_en)
             box_lang.add_widget(btn_pt)
             layout.add_widget(box_lang)
-            # --------------------------
 
             self.title_label = Label(font_size='20sp', bold=True, size_hint_y=0.1)
             layout.add_widget(self.title_label)
@@ -677,23 +686,10 @@ Não use o radar constantemente (consome 2-8% por hora).
             self.btn_choose_melody = Button(font_size='14sp', background_color=(0.4, 0.4, 0.4, 1), size_hint_x=0.3)
             self.btn_choose_melody.bind(on_press=self.choose_melody)
             box_melody.add_widget(self.melody_input)
-            box_melody.add_widget(self.btn_choose_melody)
+            box_melody.add_widget(btn_choose_melody)
             layout.add_widget(box_melody)
 
-            self.radar_lbl = Label(font_size='12sp', color=(0.2, 0.7, 0.8, 1), size_hint_y=0.05)
-            layout.add_widget(self.radar_lbl)
-            
-            self.scroll_view = ScrollView(size_hint=(1, 0.30))
-            self.devices_container = BoxLayout(orientation='vertical', spacing=5, size_hint_y=None)
-            self.devices_container.bind(minimum_height=self.devices_container.setter('height'))
-            self.scroll_view.add_widget(self.devices_container)
-            layout.add_widget(self.scroll_view)
-
-            self.btn_scan = Button(font_size='14sp', background_color=(0.2, 0.6, 0.8, 1), size_hint_y=0.1)
-            self.btn_scan.bind(on_press=self.start_ble_scan)
-            layout.add_widget(self.btn_scan)
-
-            box_bottom = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=0.1)
+            box_bottom = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=0.15)
             self.btn_inst = Button(font_size='14sp', background_color=(0.6, 0.4, 0.8, 1))
             self.btn_inst.bind(on_press=self.go_to_inst)
             self.btn_save = Button(font_size='14sp', bold=True, background_color=(0.2, 0.8, 0.2, 1))
@@ -714,8 +710,6 @@ Não use o radar constantemente (consome 2-8% por hora).
             self.mac_lbl.text = get_t("mac_lbl")
             self.mel_lbl.text = get_t("mel_lbl")
             self.btn_choose_melody.text = get_t("browse")
-            self.radar_lbl.text = get_t("radar_lbl")
-            self.btn_scan.text = get_t("scan_bt")
             self.btn_inst.text = get_t("inst_btn")
             self.btn_save.text = get_t("save_cfg")
 
@@ -734,42 +728,6 @@ Não use o radar constantemente (consome 2-8% por hora).
         def handle_selection(self, selection):
             if selection:
                 self.melody_input.text = selection[0]
-                
-        @mainthread
-        def on_device_found(self, address, name, rssi):
-            if address not in self.found_devices:
-                self.found_devices[address] = True
-                dev_name = name if name else "Device"
-                dist = calc_distance(rssi)
-                btn_text = f"{dev_name} \n[{address}] | {rssi} dBm (~{dist} {get_t('m')})"
-                
-                dev_btn = ToggleButton(text=btn_text, group='ble_dev', size_hint=(1, None), height=100, font_size='14sp')
-                dev_btn.bind(on_press=lambda inst, addr=address, d_name=dev_name: self.select_device(addr, d_name))
-                self.devices_container.add_widget(dev_btn)
-                self.devices_container.height += 105
-
-        def start_ble_scan(self, instance):
-            if not self.bluetooth_adapter:
-                return
-            self.btn_scan.disabled = True
-            self.btn_scan.text = "SCANNING..."
-            self.devices_container.clear_widgets()
-            self.devices_container.height = 0
-            self.found_devices.clear()
-            self.scan_callback = BLEScanCallback(self.on_device_found)
-            self.bluetooth_adapter.startLeScan(self.scan_callback)
-            Clock.schedule_once(self.stop_ble_scan, 4.0)
-
-        def stop_ble_scan(self, dt):
-            if self.bluetooth_adapter and self.scan_callback:
-                self.bluetooth_adapter.stopLeScan(self.scan_callback)
-                self.scan_callback = None
-            self.btn_scan.disabled = False
-            self.btn_scan.text = get_t("scan_bt")
-
-        def select_device(self, address, name):
-            self.mac_input.text = address
-            self.selected_device_name = name 
 
         def go_to_inst(self, instance):
             self.manager.current = 'instruction'
@@ -777,7 +735,6 @@ Não use o radar constantemente (consome 2-8% por hora).
         def save_config(self, instance):
             save_full_config({
                 "mac_address": self.mac_input.text.strip(),
-                "device_name": getattr(self, "selected_device_name", "Device"),
                 "melody_path": self.melody_input.text.strip()
             })
             self.manager.current = 'main'
@@ -785,15 +742,12 @@ Não use o radar constantemente (consome 2-8% por hora).
         def load_config(self):
             config = load_full_config()
             self.mac_input.text = config.get("mac_address", "")
-            self.selected_device_name = config.get("device_name", "Device")
             self.melody_input.text = config.get("melody_path", "")
 
-    # --- ЕКРАН З ІНСТРУКЦІЯМИ ---
     class InstructionScreen(Screen):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
             layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
-            
             self.title_label = Label(font_size='22sp', bold=True, size_hint_y=0.1)
             layout.add_widget(self.title_label)
             
@@ -807,7 +761,7 @@ Não use o radar constantemente (consome 2-8% por hora).
             self.btn_back = Button(font_size='16sp', bold=True, background_color=(0.3, 0.3, 0.3, 1), size_hint_y=0.1)
             self.btn_back.bind(on_press=self.go_back)
             layout.add_widget(self.btn_back)
-            
+            layout.add_widget(BoxLayout(size_hint_y=0.02)) # мінімальний відступ
             self.add_widget(layout)
             
         def on_enter(self):
@@ -842,7 +796,7 @@ Não use o radar constantemente (consome 2-8% por hora).
             sm.add_widget(SettingsScreen(name='settings'))
             sm.add_widget(FindScreen(name='find_device'))
             sm.add_widget(WifiFindScreen(name='find_wifi'))
-            sm.add_widget(InstructionScreen(name='instruction')) # Додано екран інструкцій
+            sm.add_widget(InstructionScreen(name='instruction'))
             return sm
 
     if __name__ == "__main__":
